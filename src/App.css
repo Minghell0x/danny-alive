@@ -251,6 +251,35 @@ body {
     50% { transform: scale(1.1); opacity: 0.4; }
 }
 
+/* ── Status quip ── */
+.status-quip {
+    text-align: center;
+    max-width: 500px;
+    margin-bottom: 2rem;
+    padding: 0 1rem;
+}
+.quip-text {
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--text);
+    letter-spacing: 0.02em;
+}
+.quip-text.alive {
+    color: var(--green);
+    opacity: 0.8;
+}
+.quip-text.missing {
+    color: var(--red);
+    opacity: 0.9;
+}
+.quip-sub {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    margin-top: 0.4rem;
+    letter-spacing: 0.05em;
+    font-style: italic;
+}
+
 /* ── Intel panel ── */
 .intel-panel {
     display: grid;
