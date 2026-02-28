@@ -100,13 +100,16 @@ export function DannyStatus() {
     const statusClass = loading ? 'loading' : isAlive ? 'alive' : 'missing';
 
     return (
-        <div className="container">
+        <div className={`container ${statusClass === 'missing' ? 'container-missing' : ''}`}>
             <div className="topo-bg" />
             <div className="noise" />
+            {statusClass === 'missing' && <div className="red-vignette" />}
 
             {/* Header */}
             <header className="header">
-                <div className="header-classification">CLASSIFIED</div>
+                <div className={`header-classification ${statusClass === 'missing' ? 'hc-red' : ''}`}>
+                    {statusClass === 'missing' ? '⚠ ALERT ⚠' : 'CLASSIFIED'}
+                </div>
                 <div className="header-title">OPNet Deadman Protocol</div>
                 <div className="header-sub">Field Operative Status Monitor</div>
                 <div className="header-line" />
@@ -114,7 +117,7 @@ export function DannyStatus() {
 
             <main className="main">
                 {/* Dog tag */}
-                <div className="dog-tag">
+                <div className={`dog-tag ${statusClass === 'missing' ? 'dog-tag-missing' : ''}`}>
                     <div className="dog-tag-body">
                         <div className="dog-tag-notch" />
                         <div className="dog-tag-line name">DANNY</div>
@@ -123,6 +126,29 @@ export function DannyStatus() {
                         <div className="dog-tag-line callsign">ID: {DANNY_ADDRESS.substring(0, 20)}...</div>
                     </div>
                 </div>
+
+                {/* MISSING dramatic center piece */}
+                {statusClass === 'missing' && !loading && (
+                    <div className="missing-drama">
+                        <div className="missing-cross">
+                            <div className="cross-v" />
+                            <div className="cross-h" />
+                        </div>
+                        <div className="missing-stamp">MIA</div>
+                        <div className="missing-subtitle">MISSING IN ACTION</div>
+                        <div className="missing-detail">
+                            Last transmission: {timeSince ?? 'NEVER'}
+                        </div>
+                        <div className="missing-detail">
+                            Check-in window expired. Operative has not reported.
+                        </div>
+                        <div className="missing-static">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <div key={i} className="static-bar" style={{ animationDelay: `${i * 0.3}s` }} />
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Status badge */}
                 <div className="status-display">
