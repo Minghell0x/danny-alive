@@ -1,7 +1,10 @@
 import { useWalletConnect, SupportedWallets } from '@btc-vision/walletconnect';
 import { useEffect, useState, useCallback } from 'react';
 
-const DANNY_ADDRESS = 'opt1pp4j4gpqh2qesaz0uhs0rnu4n4q2xlj7cpgqqep2kl0g9fysd3lss2n0e0t';
+const ALLOWED_ADDRESSES = [
+    'opt1pp4j4gpqh2qesaz0uhs0rnu4n4q2xlj7cpgqqep2kl0g9fysd3lss2n0e0t',
+    'opt1ppw62uk38kc6fpce0h2rm87zcyhhe9lxaqhdx6z3gu7qh8qzu5gxq7us3t4',
+];
 const CHECKIN_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 interface StatusData {
@@ -44,7 +47,7 @@ export function DannyStatus() {
         }
     };
 
-    const isDanny = walletAddress?.toLowerCase() === DANNY_ADDRESS.toLowerCase();
+    const isDanny = ALLOWED_ADDRESSES.some(a => walletAddress?.toLowerCase() === a.toLowerCase());
     const isAlive = status.lastCheckin !== null &&
         (Date.now() - status.lastCheckin) < CHECKIN_WINDOW_MS;
 
