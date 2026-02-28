@@ -2,7 +2,7 @@ import { useWalletConnect, SupportedWallets } from '@btc-vision/walletconnect';
 import { useEffect, useState, useCallback } from 'react';
 
 const DANNY_ADDRESS = 'opt1pp4j4gpqh2qesaz0uhs0rnu4n4q2xlj7cpgqqep2kl0g9fysd3lss2n0e0t';
-const CHECKIN_WINDOW_MS = 48 * 60 * 60 * 1000; // 48 hours
+const CHECKIN_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 interface StatusData {
     lastCheckin: number | null;
@@ -25,10 +25,9 @@ export function DannyStatus() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
-    // Fetch status on load
     useEffect(() => {
         fetchStatus();
-        const interval = setInterval(fetchStatus, 30000); // refresh every 30s
+        const interval = setInterval(fetchStatus, 30000);
         return () => clearInterval(interval);
     }, []);
 
@@ -38,11 +37,8 @@ export function DannyStatus() {
             const data = await res.json();
             setStatus(data);
         } catch {
-            // API not available — check localStorage fallback
             const stored = localStorage.getItem('danny_checkin');
-            if (stored) {
-                setStatus(JSON.parse(stored));
-            }
+            if (stored) setStatus(JSON.parse(stored));
         } finally {
             setLoading(false);
         }
@@ -52,10 +48,7 @@ export function DannyStatus() {
     const isAlive = status.lastCheckin !== null &&
         (Date.now() - status.lastCheckin) < CHECKIN_WINDOW_MS;
 
-    const timeSince = status.lastCheckin
-        ? formatTimeSince(status.lastCheckin)
-        : null;
-
+    const timeSince = status.lastCheckin ? formatTimeSince(status.lastCheckin) : null;
     const timeLeft = status.lastCheckin
         ? formatTimeLeft(status.lastCheckin + CHECKIN_WINDOW_MS - Date.now())
         : null;
@@ -70,13 +63,8 @@ export function DannyStatus() {
             const timestamp = Date.now();
             const message = `Danny is alive. Timestamp: ${timestamp}`;
             const signature = await walletInstance.signMessage(message);
+            if (!signature) { setError('Signing cancelled'); return; }
 
-            if (!signature) {
-                setError('Signing cancelled or failed');
-                return;
-            }
-
-            // Try API first
             try {
                 const res = await fetch('/api/checkin', {
                     method: 'POST',
@@ -88,17 +76,9 @@ export function DannyStatus() {
                         address: walletAddress,
                     }),
                 });
+                if (res.ok) { setSuccess(true); await fetchStatus(); return; }
+            } catch { /* API not available */ }
 
-                if (res.ok) {
-                    setSuccess(true);
-                    await fetchStatus();
-                    return;
-                }
-            } catch {
-                // API not available — use localStorage fallback
-            }
-
-            // Fallback: store locally
             const data: StatusData = { lastCheckin: timestamp, message };
             localStorage.setItem('danny_checkin', JSON.stringify(data));
             setStatus(data);
@@ -110,116 +90,127 @@ export function DannyStatus() {
         }
     }, [walletInstance, isDanny, walletAddress]);
 
-    // Live countdown
+    // Live tick
     const [, setTick] = useState(0);
     useEffect(() => {
         const t = setInterval(() => setTick(c => c + 1), 1000);
         return () => clearInterval(t);
     }, []);
 
+    const statusClass = loading ? 'loading' : isAlive ? 'alive' : 'missing';
+
     return (
         <div className="container">
-            {/* Background grid */}
-            <div className="grid-bg" />
-
-            {/* Scanline effect */}
-            <div className="scanline" />
+            <div className="topo-bg" />
+            <div className="noise" />
 
             {/* Header */}
             <header className="header">
-                <div className="header-tag">OPNET DEADMAN PROTOCOL</div>
+                <div className="header-classification">CLASSIFIED</div>
+                <div className="header-title">OPNet Deadman Protocol</div>
+                <div className="header-sub">Field Operative Status Monitor</div>
                 <div className="header-line" />
             </header>
 
-            {/* Main status */}
             <main className="main">
-                <div className={`status-orb ${isAlive ? 'alive' : 'missing'} ${loading ? 'loading' : ''}`}>
-                    <div className="orb-ring" />
-                    <div className="orb-ring ring-2" />
-                    <div className="orb-core">
-                        <div className="orb-icon">{isAlive ? '♥' : '✕'}</div>
+                {/* Dog tag */}
+                <div className="dog-tag">
+                    <div className="dog-tag-body">
+                        <div className="dog-tag-notch" />
+                        <div className="dog-tag-line name">DANNY</div>
+                        <div className="dog-tag-line">OPNET CREATOR</div>
+                        <div className="dog-tag-line callsign">CALLSIGN: GENESIS</div>
+                        <div className="dog-tag-line callsign">ID: {DANNY_ADDRESS.substring(0, 20)}...</div>
                     </div>
                 </div>
 
-                <h1 className={`status-text ${isAlive ? 'alive' : 'missing'}`}>
-                    {loading ? 'CHECKING...' : isAlive ? 'DANNY IS ALIVE' : 'DANNY IS MISSING'}
-                </h1>
-
-                <div className="status-sub">
-                    {status.lastCheckin ? (
-                        <>
-                            <span className="label">LAST SIGNAL</span>
-                            <span className="value">{timeSince}</span>
-                            {isAlive && timeLeft && (
-                                <>
-                                    <span className="divider">|</span>
-                                    <span className="label">EXPIRES IN</span>
-                                    <span className="value countdown">{timeLeft}</span>
-                                </>
-                            )}
-                        </>
-                    ) : (
-                        <span className="value">NO SIGNAL RECORDED</span>
-                    )}
+                {/* Status badge */}
+                <div className="status-display">
+                    <div className={`status-badge ${statusClass}`}>
+                        <div className={`status-indicator ${statusClass}`} />
+                        {loading ? 'CHECKING...' : isAlive ? 'OPERATIVE ALIVE' : 'OPERATIVE MISSING'}
+                    </div>
                 </div>
 
-                {/* EKG line */}
-                <div className="ekg-container">
-                    <svg viewBox="0 0 600 80" className={`ekg ${isAlive ? 'alive' : 'flat'}`}>
-                        {isAlive ? (
+                {/* Intel panel */}
+                <div className="intel-panel">
+                    <div className="intel-cell">
+                        <div className="intel-label">Last Signal</div>
+                        <div className="intel-value">{timeSince ?? '—'}</div>
+                    </div>
+                    <div className="intel-cell">
+                        <div className="intel-label">Window</div>
+                        <div className={`intel-value ${isAlive ? 'countdown' : 'expired'}`}>
+                            {status.lastCheckin ? (isAlive ? timeLeft : 'EXPIRED') : '—'}
+                        </div>
+                    </div>
+                    <div className="intel-cell">
+                        <div className="intel-label">Protocol</div>
+                        <div className="intel-value">48H</div>
+                    </div>
+                </div>
+
+                {/* Signal line */}
+                <div className="radio-line">
+                    <svg viewBox="0 0 500 40" className="radio-svg" preserveAspectRatio="none">
+                        {isAlive && !loading ? (
                             <polyline
-                                className="ekg-line"
-                                points="0,40 80,40 100,40 115,10 130,70 145,20 160,50 175,40 200,40 280,40 300,40 315,10 330,70 345,20 360,50 375,40 400,40 480,40 500,40 515,10 530,70 545,20 560,50 575,40 600,40"
-                                fill="none"
-                                strokeWidth="2"
+                                className="signal-line alive"
+                                points="0,20 60,20 80,20 90,5 100,35 110,8 118,25 126,20 160,20 220,20 240,20 250,5 260,35 270,8 278,25 286,20 320,20 380,20 400,20 410,5 420,35 430,8 438,25 446,20 500,20"
                             />
                         ) : (
-                            <line className="ekg-flat" x1="0" y1="40" x2="600" y2="40" strokeWidth="2" />
+                            <line className="signal-line flat" x1="0" y1="20" x2="500" y2="20" />
                         )}
                     </svg>
                 </div>
             </main>
 
-            {/* Wallet section */}
-            <section className="wallet-section">
-                {!walletAddress ? (
-                    <div className="connect-area">
-                        <p className="connect-label">DANNY: PROVE YOU'RE ALIVE</p>
-                        <div className="connect-buttons">
-                            <button className="btn btn-primary" onClick={() => connectToWallet(SupportedWallets.OP_WALLET)}>
-                                {connecting ? 'CONNECTING...' : 'CONNECT OP_WALLET'}
-                            </button>
-                            <button className="btn btn-secondary" onClick={openConnectModal}>
-                                OTHER WALLET
-                            </button>
+            {/* Comms panel */}
+            <section className="comms-panel">
+                <div className="comms-header">
+                    <div className="comms-dot" />
+                    Secure Communications Channel
+                </div>
+                <div className="comms-body">
+                    {!walletAddress ? (
+                        <>
+                            <p className="connect-label">Authenticate to Check In</p>
+                            <div className="connect-buttons">
+                                <button className="btn btn-primary" onClick={() => connectToWallet(SupportedWallets.OP_WALLET)}>
+                                    {connecting ? 'CONNECTING...' : '🪖 CONNECT OP_WALLET'}
+                                </button>
+                                <button className="btn btn-secondary" onClick={openConnectModal}>
+                                    OTHER WALLET
+                                </button>
+                            </div>
+                        </>
+                    ) : !isDanny ? (
+                        <div className="wrong-wallet">
+                            <div className="warning-icon">⛔</div>
+                            <p>ACCESS DENIED</p>
+                            <p className="small">Wallet: {walletAddress.substring(0, 20)}...</p>
+                            <p className="small">Only the field operative's wallet can transmit.</p>
+                            <button className="btn btn-secondary" onClick={disconnect}>DISCONNECT</button>
                         </div>
-                    </div>
-                ) : !isDanny ? (
-                    <div className="wrong-wallet">
-                        <div className="warning-icon">⚠</div>
-                        <p>UNAUTHORIZED WALLET</p>
-                        <p className="small">Connected: {walletAddress.substring(0, 16)}...</p>
-                        <p className="small">Only Danny's wallet can check in.</p>
-                        <button className="btn btn-secondary" onClick={disconnect}>DISCONNECT</button>
-                    </div>
-                ) : (
-                    <div className="danny-area">
-                        <div className="identity-badge">
-                            <span className="badge-icon">✓</span>
-                            <span>DANNY IDENTIFIED</span>
+                    ) : (
+                        <div className="danny-area">
+                            <div className="identity-badge">
+                                <span className="badge-icon">✓</span>
+                                <span>IDENTITY CONFIRMED</span>
+                            </div>
+                            <button
+                                className="btn btn-checkin"
+                                onClick={handleCheckin}
+                                disabled={signing}
+                            >
+                                {signing ? 'SIGNING TRANSMISSION...' : '📡 TRANSMIT PROOF OF LIFE'}
+                            </button>
+                            {error && <p className="error-msg">⚠ {error}</p>}
+                            {success && <p className="success-msg">✓ SIGNAL RECEIVED — STATUS UPDATED</p>}
+                            <button className="btn btn-secondary btn-small" onClick={disconnect}>END TRANSMISSION</button>
                         </div>
-                        <button
-                            className="btn btn-checkin"
-                            onClick={handleCheckin}
-                            disabled={signing}
-                        >
-                            {signing ? 'SIGN THE MESSAGE...' : '⚡ I\'M ALIVE — CHECK IN'}
-                        </button>
-                        {error && <p className="error-msg">{error}</p>}
-                        {success && <p className="success-msg">✓ CHECK-IN RECORDED</p>}
-                        <button className="btn btn-secondary btn-small" onClick={disconnect}>DISCONNECT</button>
-                    </div>
-                )}
+                    )}
+                </div>
             </section>
 
             {/* Footer */}
@@ -227,9 +218,9 @@ export function DannyStatus() {
                 <div className="footer-line" />
                 <div className="footer-content">
                     <span>DEADMAN PROTOCOL v1.0</span>
-                    <span className="divider">•</span>
+                    <span className="sep">•</span>
                     <span>48H CHECK-IN WINDOW</span>
-                    <span className="divider">•</span>
+                    <span className="sep">•</span>
                     <span>OPNET NETWORK</span>
                 </div>
             </footer>
