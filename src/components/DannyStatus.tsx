@@ -126,7 +126,7 @@ export function DannyStatus() {
                         <div className="dog-tag-line name">DANNY</div>
                         <div className="dog-tag-line">OPNET CREATOR</div>
                         <div className="dog-tag-line callsign">CALLSIGN: GENESIS</div>
-                        <div className="dog-tag-line callsign">ID: {DANNY_ADDRESS.substring(0, 20)}...</div>
+                        <div className="dog-tag-line callsign">ID: {ALLOWED_ADDRESSES[0].substring(0, 20)}...</div>
                     </div>
                 </div>
 
@@ -218,7 +218,7 @@ export function DannyStatus() {
                             <div className="warning-icon">⛔</div>
                             <p>ACCESS DENIED</p>
                             <p className="small">Wallet: {walletAddress}</p>
-                            <p className="small">Expected: {DANNY_ADDRESS.substring(0, 30)}...</p>
+                            <p className="small">Expected: {ALLOWED_ADDRESSES[0].substring(0, 30)}...</p>
                             <p className="small">Only the field operative's wallet can transmit.</p>
                             <button className="btn btn-secondary" onClick={disconnect}>DISCONNECT</button>
                         </div>
