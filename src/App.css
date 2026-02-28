@@ -116,11 +116,18 @@ body {
     flex: 1;
 }
 
+/* ── Tag row (cross + dog tag side by side) ── */
+.tag-row {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+}
+
 /* ── Dog tag ── */
 .dog-tag {
     position: relative;
     width: 280px;
-    margin-bottom: 2.5rem;
     transform: rotate(-2deg);
 }
 .dog-tag-body {
@@ -567,17 +574,17 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 2.5rem;
+    margin-bottom: 2rem;
     position: relative;
 }
 
 /* War memorial cross */
 .missing-cross {
     position: relative;
-    width: 80px;
-    height: 100px;
-    margin-bottom: 1.5rem;
-    opacity: 0.15;
+    width: 60px;
+    height: 80px;
+    flex-shrink: 0;
+    opacity: 0.2;
 }
 .cross-v {
     position: absolute;

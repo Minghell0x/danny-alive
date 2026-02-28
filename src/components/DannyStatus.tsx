@@ -119,24 +119,28 @@ export function DannyStatus() {
             </header>
 
             <main className="main">
-                {/* Dog tag */}
-                <div className={`dog-tag ${statusClass === 'missing' ? 'dog-tag-missing' : ''}`}>
-                    <div className="dog-tag-body">
-                        <div className="dog-tag-notch" />
-                        <div className="dog-tag-line name">DANNY</div>
-                        <div className="dog-tag-line">OPNET CREATOR</div>
-                        <div className="dog-tag-line callsign">CALLSIGN: GENESIS</div>
-                        <div className="dog-tag-line callsign">ID: {ALLOWED_ADDRESSES[0].substring(0, 20)}...</div>
-                    </div>
-                </div>
-
-                {/* MISSING dramatic center piece */}
-                {statusClass === 'missing' && !loading && (
-                    <div className="missing-drama">
+                {/* Dog tag + cross row */}
+                <div className="tag-row">
+                    {statusClass === 'missing' && !loading && (
                         <div className="missing-cross">
                             <div className="cross-v" />
                             <div className="cross-h" />
                         </div>
+                    )}
+                    <div className={`dog-tag ${statusClass === 'missing' ? 'dog-tag-missing' : ''}`}>
+                        <div className="dog-tag-body">
+                            <div className="dog-tag-notch" />
+                            <div className="dog-tag-line name">DANNY</div>
+                            <div className="dog-tag-line">OPNET CREATOR</div>
+                            <div className="dog-tag-line callsign">CALLSIGN: GENESIS</div>
+                            <div className="dog-tag-line callsign">ID: {ALLOWED_ADDRESSES[0].substring(0, 20)}...</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* MISSING dramatic stamp */}
+                {statusClass === 'missing' && !loading && (
+                    <div className="missing-drama">
                         <div className="missing-stamp">MIA</div>
                         <div className="missing-subtitle">MISSING IN ACTION</div>
                         <div className="missing-detail">
