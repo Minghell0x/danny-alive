@@ -214,7 +214,8 @@ export function DannyStatus() {
                         <div className="wrong-wallet">
                             <div className="warning-icon">⛔</div>
                             <p>ACCESS DENIED</p>
-                            <p className="small">Wallet: {walletAddress.substring(0, 20)}...</p>
+                            <p className="small">Wallet: {walletAddress}</p>
+                            <p className="small">Expected: {DANNY_ADDRESS.substring(0, 30)}...</p>
                             <p className="small">Only the field operative's wallet can transmit.</p>
                             <button className="btn btn-secondary" onClick={disconnect}>DISCONNECT</button>
                         </div>
