@@ -312,11 +312,11 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
     // ── ALIVE: starting to notice (24h-36h) ──
     if (remaining > 24) return {
         quip: pick([
-            'Past the halfway mark. Just an observation, not a concern.',
-            'More than 24 hours used. Still technically "fine".',
-            'The window is half empty. Or half full. Depends on your outlook.',
+            'Clock is running. Nothing dramatic. Just... running.',
+            'Danny checked in recently enough that we\'re not sweating. Emphasis on "enough".',
+            'Over a third of the window used. Mathematically unremarkable. Emotionally noted.',
         ]),
-        sub: 'Probably a good time to check in, Danny. No pressure.',
+        sub: 'No action required. But we wouldn\'t complain if Danny popped in.',
     };
 
     // ── ALIVE: getting nervous (12h-24h) ──
