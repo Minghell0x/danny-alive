@@ -53,11 +53,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // If there's a current check-in but no history yet, seed first entry
         if (data?.lastCheckin && history.length === 0) {
-            const seed = {
+            const seed: HistoryEntry = {
                 timestamp: data.lastCheckin,
                 address: (data as Record<string, unknown>).address as string ?? '',
+                remainingMs: 12600000, // 3h 30m left when he checked in
             };
-            history.push(seed as HistoryEntry);
+            history.push(seed);
             await redis.lpush('danny:checkin:history', seed).catch(() => {});
         }
 
