@@ -31,6 +31,8 @@ export function DannyStatus() {
     } = useWalletConnect();
 
     const [status, setStatus] = useState<StatusData>({ lastCheckin: null, message: null, history: [] });
+    const [historyPage, setHistoryPage] = useState(1);
+    const HISTORY_PER_PAGE = 10;
     const [loading, setLoading] = useState(true);
     const [signing, setSigning] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -235,47 +237,81 @@ export function DannyStatus() {
             </main>
 
             {/* Check-in History */}
-            {status.history.length > 0 && (
-                <section className="history-panel">
-                    <div className="history-header">
-                        <div className="comms-dot" />
-                        Field Transmission Log
-                    </div>
-                    <div className="history-body">
-                        {status.history.map((entry) => {
-                            const rMs = typeof entry.remainingMs === 'number' ? entry.remainingMs : null;
-                            const rH = rMs !== null ? rMs / 3600000 : null;
-                            const tier = getHistoryTier(rH);
-                            const quip = rMs !== null
-                                ? getHistoryQuip(rMs, entry.timestamp)
-                                : 'First recorded transmission. The legend begins.';
-                            const d = new Date(entry.timestamp);
+            {status.history.length > 0 && (() => {
+                const visible = status.history.slice(0, historyPage * HISTORY_PER_PAGE);
+                const hasMore = status.history.length > visible.length;
+                const totalPages = Math.ceil(status.history.length / HISTORY_PER_PAGE);
 
-                            return (
-                                <div key={entry.timestamp} className={`history-entry ${tier}`}>
-                                    <div className="history-entry-header">
-                                        <span className={`history-dot ${tier}`} />
-                                        <span className="history-date">
-                                            {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </span>
-                                        <span className="history-time">
-                                            {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })} UTC
-                                        </span>
-                                        <span className={`history-gap ${tier}`}>
-                                            {rH === null ? 'first'
-                                                : rH < 0 ? `${Math.abs(Math.round(rH))}h overdue`
-                                                : rH < 1 ? `${Math.max(1, Math.round((rMs ?? 0) / 60000))}m left`
-                                                : `${Math.round(rH)}h left`
-                                            }
-                                        </span>
+                return (
+                    <section className="history-panel">
+                        <div className="history-header">
+                            <div className="comms-dot" />
+                            Field Transmission Log
+                            <span className="history-count">
+                                {status.history.length} transmission{status.history.length !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        <div className="history-body">
+                            {visible.map((entry) => {
+                                const rMs = typeof entry.remainingMs === 'number' ? entry.remainingMs : null;
+                                const rH = rMs !== null ? rMs / 3600000 : null;
+                                const tier = getHistoryTier(rH);
+                                const quip = rMs !== null
+                                    ? getHistoryQuip(rMs, entry.timestamp)
+                                    : 'First recorded transmission. The legend begins.';
+                                const d = new Date(entry.timestamp);
+
+                                return (
+                                    <div key={entry.timestamp} className={`history-entry ${tier}`}>
+                                        <div className="history-entry-header">
+                                            <span className={`history-dot ${tier}`} />
+                                            <span className="history-date">
+                                                {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                            </span>
+                                            <span className="history-time">
+                                                {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })} UTC
+                                            </span>
+                                            <span className={`history-gap ${tier}`}>
+                                                {rH === null ? 'first'
+                                                    : rH < 0 ? `${Math.abs(Math.round(rH))}h overdue`
+                                                    : rH < 1 ? `${Math.max(1, Math.round((rMs ?? 0) / 60000))}m left`
+                                                    : `${Math.round(rH)}h left`
+                                                }
+                                            </span>
+                                        </div>
+                                        <div className={`history-quip ${tier}`}>{quip}</div>
                                     </div>
-                                    <div className={`history-quip ${tier}`}>{quip}</div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </section>
-            )}
+                                );
+                            })}
+                        </div>
+                        {(hasMore || historyPage > 1) && (
+                            <div className="history-footer">
+                                {historyPage > 1 && (
+                                    <button
+                                        className="btn btn-secondary btn-small"
+                                        onClick={() => setHistoryPage(1)}
+                                    >
+                                        ▲ SHOW LESS
+                                    </button>
+                                )}
+                                {hasMore && (
+                                    <button
+                                        className="btn btn-secondary btn-small"
+                                        onClick={() => setHistoryPage(p => p + 1)}
+                                    >
+                                        ▼ OLDER TRANSMISSIONS ({status.history.length - visible.length} more)
+                                    </button>
+                                )}
+                                {totalPages > 1 && (
+                                    <span className="history-page-info">
+                                        Page {historyPage} of {totalPages}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </section>
+                );
+            })()}
 
             {/* Comms panel */}
             <section className="comms-panel">

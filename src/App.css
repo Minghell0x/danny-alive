@@ -874,6 +874,34 @@ body {
 .history-quip.clutch { color: #ff6600; opacity: 0.9; }
 .history-quip.overdue { color: var(--red); opacity: 0.8; }
 
+.history-count {
+    margin-left: auto;
+    font-size: 0.5rem;
+    opacity: 0.5;
+    letter-spacing: 0.1em;
+}
+
+.history-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid var(--bg-card-border);
+    flex-wrap: wrap;
+}
+.history-footer .btn-small {
+    font-size: 0.55rem;
+    padding: 0.35rem 0.8rem;
+    letter-spacing: 0.1em;
+}
+.history-page-info {
+    font-size: 0.5rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    opacity: 0.6;
+}
+
 /* ── Responsive ── */
 @media (max-width: 600px) {
     .status-badge { font-size: 1.8rem; padding: 0.8rem 1.5rem; }
