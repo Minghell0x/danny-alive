@@ -309,12 +309,12 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Status: unremarkably alive.',
     };
 
-    // ── ALIVE: starting to notice (24h-36h) ──
+    // ── ALIVE: starting to notice (24h-36h remaining = 12-24h elapsed) ──
     if (remaining > 24) return {
         quip: pick([
             'Clock is running. Nothing dramatic. Just... running.',
             'Danny checked in recently enough that we\'re not sweating. Emphasis on "enough".',
-            'Over a third of the window used. Mathematically unremarkable. Emotionally noted.',
+            'Still in the comfortable zone. For now.',
         ]),
         sub: 'No action required. But we wouldn\'t complain if Danny popped in.',
     };
@@ -330,13 +330,13 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Totally not refreshing this page every 5 minutes.',
     };
 
-    // ── ALIVE: sweating (6h-12h) ──
+    // ── ALIVE: sweating (6h-12h remaining = 36-42h elapsed) ──
     if (remaining > 6) return {
         quip: pick([
-            'Single digit hours remaining. This is fine. Everything is fine.',
+            'Under 12 hours. This is fine. Everything is fine.',
             'Danny, if you\'re reading this... now would be good.',
             'We\'re entering "should we text him?" territory.',
-            'Less than 12 hours. The EKG line is getting nervous.',
+            'The EKG line is getting nervous and honestly so are we.',
         ]),
         sub: 'Someone check if Danny\'s phone is charged.',
     };
