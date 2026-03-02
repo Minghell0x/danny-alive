@@ -51,6 +51,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             };
         });
 
+        // If there's a current check-in but no history yet, seed first entry
+        if (data?.lastCheckin && history.length === 0) {
+            const seed = {
+                timestamp: data.lastCheckin,
+                address: (data as Record<string, unknown>).address as string ?? '',
+            };
+            history.push(seed as HistoryEntry);
+            await redis.lpush('danny:checkin:history', seed).catch(() => {});
+        }
+
         return res.status(200).json({
             lastCheckin: data?.lastCheckin ?? null,
             message: data?.message ?? null,
