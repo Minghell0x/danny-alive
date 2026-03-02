@@ -5,7 +5,7 @@ const ALLOWED_ADDRESSES = [
     'opt1pp4j4gpqh2qesaz0uhs0rnu4n4q2xlj7cpgqqep2kl0g9fysd3lss2n0e0t',
     'opt1ppw62uk38kc6fpce0h2rm87zcyhhe9lxaqhdx6z3gu7qh8qzu5gxq7us3t4',
 ];
-const CHECKIN_WINDOW_MS = 48 * 60 * 60 * 1000;
+const CHECKIN_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 interface StatusData {
     lastCheckin: number | null;
@@ -105,7 +105,7 @@ export function DannyStatus() {
         : null;
     const statusClass = loading ? 'loading'
         : !isAlive ? 'missing'
-        : remaining !== null && remaining <= 24 ? 'warning'
+        : remaining !== null && remaining <= 12 ? 'warning'
         : 'alive';
     const { quip, sub: quipSub } = loading
         ? { quip: '', sub: '' }
@@ -199,7 +199,7 @@ export function DannyStatus() {
                     </div>
                     <div className="intel-cell">
                         <div className="intel-label">Protocol</div>
-                        <div className="intel-value">48H</div>
+                        <div className="intel-value">24H</div>
                     </div>
                 </div>
 
@@ -273,7 +273,7 @@ export function DannyStatus() {
                 <div className="footer-content">
                     <span>DEADMAN PROTOCOL v1.0</span>
                     <span className="sep">•</span>
-                    <span>48H CHECK-IN WINDOW</span>
+                    <span>24H CHECK-IN WINDOW</span>
                     <span className="sep">•</span>
                     <span>OPNET NETWORK</span>
                 </div>
@@ -292,14 +292,14 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
 
     const elapsed = Date.now() - lastCheckin;
     const hoursElapsed = elapsed / 3600000;
-    const remaining = 48 - hoursElapsed;
+    const remaining = 24 - hoursElapsed;
 
     // Rotate quips per minute so they don't flicker every second
     const minute = Math.floor(Date.now() / 60000);
     const pick = (arr: string[]) => arr[minute % arr.length];
 
-    // ── ALIVE: plenty of time (44h-48h remaining) ──
-    if (remaining > 44) return {
+    // ── ALIVE: fresh (20h-24h remaining = 0-4h elapsed) ──
+    if (remaining > 20) return {
         quip: pick([
             'All systems nominal. Danny is presumably alive and doing Danny things.',
             'Signal strong. No reason to panic. Yet.',
@@ -308,8 +308,8 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Check-in window is wide open. Nothing to see here.',
     };
 
-    // ── ALIVE: comfortable (36h-44h) ──
-    if (remaining > 36) return {
+    // ── ALIVE: comfortable (16h-20h remaining = 4-8h elapsed) ──
+    if (remaining > 16) return {
         quip: pick([
             'Still well within parameters. Relax.',
             'Danny has plenty of time. Go touch grass.',
@@ -318,8 +318,8 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Status: unremarkably alive.',
     };
 
-    // ── ALIVE: starting to notice (24h-36h remaining = 12-24h elapsed) ──
-    if (remaining > 24) return {
+    // ── ALIVE: cruising (12h-16h remaining = 8-12h elapsed) ──
+    if (remaining > 12) return {
         quip: pick([
             'Clock is running. Nothing dramatic. Just... running.',
             'Danny checked in recently enough that we\'re not sweating. Emphasis on "enough".',
@@ -328,21 +328,21 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'No action required. But we wouldn\'t complain if Danny popped in.',
     };
 
-    // ── WARNING: under 24h (12h-24h remaining) ──
-    if (remaining > 12) return {
+    // ── WARNING: under 12h (8h-12h remaining) ──
+    if (remaining > 8) return {
         quip: pick([
-            'Under 24 hours. The signal is weakening. We can feel it.',
-            'Danny has not checked in for over a day. The protocol is watching.',
+            'Under 12 hours. The signal is weakening. We can feel it.',
             'The green light is flickering. It doesn\'t like what it sees.',
             'We\'ve moved from "he\'s fine" to "he\'s probably fine." Note the probably.',
+            'Half the window gone. The other half isn\'t looking too confident either.',
         ]),
         sub: 'This is the part where smart people start paying attention.',
     };
 
-    // ── WARNING: under 12h (6h-12h remaining) ──
-    if (remaining > 6) return {
+    // ── WARNING: under 8h (4h-8h remaining) ──
+    if (remaining > 4) return {
         quip: pick([
-            'Under 12 hours and the silence is getting loud.',
+            'Under 8 hours and the silence is getting loud.',
             'Danny, if you\'re reading this, the window is closing and we\'re not joking anymore.',
             'We\'re past "should we text him" and into "does anyone have his mom\'s number."',
             'The heartbeat monitor is stuttering. Figuratively. For now.',
@@ -350,10 +350,10 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Genuinely starting to worry. Not a bit. Not a joke.',
     };
 
-    // ── WARNING: critical (1h-6h remaining) ──
+    // ── WARNING: critical (1h-4h remaining) ──
     if (remaining > 1) return {
         quip: pick([
-            'HOURS. Single digit hours. The kind that run out.',
+            'HOURS. The kind that run out. Fast.',
             'Danny we are not asking anymore. We are begging. Check in.',
             'The countdown is giving the entire community a collective panic attack.',
             'This is not a vibe check. This is a welfare check.',
@@ -367,24 +367,24 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
             'UNDER ONE HOUR. THIS IS NOT A DRILL. REPEAT: NOT A DRILL.',
             'Danny. DANNY. The button. PRESS IT. The red stamp is LOADED.',
             'Minutes. We are counting in MINUTES now. Do you understand.',
-            'The MIA stamp is inked, cocked, and ready to fire. One hour.',
+            'The MIA stamp is inked, cocked, and ready to fire.',
         ]),
         sub: 'Every second that passes is a second closer to MIA status. Move.',
     };
 
-    // ── MISSING: just expired (0-2h overdue) ──
-    const overdue = hoursElapsed - 48;
-    if (overdue < 2) return {
+    // ── MISSING: just expired (0-1h overdue) ──
+    const overdue = hoursElapsed - 24;
+    if (overdue < 1) return {
         quip: pick([
             'He\'s probably just getting coffee. A really long coffee.',
             'Technically overdue. But who\'s counting? We are. We\'re counting.',
             'Window expired but let\'s not jump to conclusions. He might be in a tunnel.',
         ]),
-        sub: 'Give it a minute. Or 120 of them.',
+        sub: 'Give it a minute. Or 60 of them.',
     };
 
-    // ── MISSING: few hours (2-6h overdue) ──
-    if (overdue < 6) return {
+    // ── MISSING: few hours (1-4h overdue) ──
+    if (overdue < 4) return {
         quip: pick([
             'His phone probably died. Phones die all the time. Right? RIGHT?',
             'Maybe he\'s on a plane. A very long plane ride. To Mars.',
@@ -394,13 +394,13 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'We\'re not worried. This is our not-worried face.',
     };
 
-    // ── MISSING: half day (6-12h overdue) ──
+    // ── MISSING: half day (4-12h overdue) ──
     if (overdue < 12) return {
         quip: pick([
             'Starting to rehearse "I\'m sure he\'s fine" with less conviction.',
             'We\'ve checked the hospitals. Just kidding. But we thought about it.',
             'This is the part of the movie where someone says "when did you last hear from him?"',
-            'Half a day overdue. The "he\'s just busy" excuse is losing credibility.',
+            'The "he\'s just busy" excuse is losing credibility fast.',
         ]),
         sub: 'The community is asking questions. We don\'t have answers.',
     };
@@ -410,7 +410,7 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         quip: pick([
             'This is fine. 🔥 Everything is fine. 🔥🔥',
             'If Danny were a pizza delivery, we\'d have gotten it for free by now.',
-            'Over 12 hours late. Even "fashionably late" has its limits.',
+            'A full day overdue. Even "fashionably late" has its limits.',
             'The protocol exists for a reason. This is the reason.',
         ]),
         sub: 'Someone go knock on his door. Does anyone know where he lives? Asking for a protocol.',
@@ -419,7 +419,7 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
     // ── MISSING: two days (24-48h overdue) ──
     if (overdue < 48) return {
         quip: pick([
-            'It\'s been over a day. We\'ve moved past denial into bargaining.',
+            'Two days without contact. We\'ve moved past denial into bargaining.',
             'We\'re officially in "should we call someone?" territory. Who do we call?',
             'The vibes are off. Severely, catastrophically off.',
             'Danny, if you\'re being held hostage, blink twice. Oh wait, this is a website.',
