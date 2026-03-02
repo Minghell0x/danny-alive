@@ -234,6 +234,49 @@ export function DannyStatus() {
                 </div>
             </main>
 
+            {/* Check-in History */}
+            {status.history.length > 0 && (
+                <section className="history-panel">
+                    <div className="history-header">
+                        <div className="comms-dot" />
+                        Field Transmission Log
+                    </div>
+                    <div className="history-body">
+                        {status.history.map((entry) => {
+                            const rMs = typeof entry.remainingMs === 'number' ? entry.remainingMs : null;
+                            const rH = rMs !== null ? rMs / 3600000 : null;
+                            const tier = getHistoryTier(rH);
+                            const quip = rMs !== null
+                                ? getHistoryQuip(rMs, entry.timestamp)
+                                : 'First recorded transmission. The legend begins.';
+                            const d = new Date(entry.timestamp);
+
+                            return (
+                                <div key={entry.timestamp} className={`history-entry ${tier}`}>
+                                    <div className="history-entry-header">
+                                        <span className={`history-dot ${tier}`} />
+                                        <span className="history-date">
+                                            {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </span>
+                                        <span className="history-time">
+                                            {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })} UTC
+                                        </span>
+                                        <span className={`history-gap ${tier}`}>
+                                            {rH === null ? 'first'
+                                                : rH < 0 ? `${Math.abs(Math.round(rH))}h overdue`
+                                                : rH < 1 ? `${Math.max(1, Math.round((rMs ?? 0) / 60000))}m left`
+                                                : `${Math.round(rH)}h left`
+                                            }
+                                        </span>
+                                    </div>
+                                    <div className={`history-quip ${tier}`}>{quip}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+            )}
+
             {/* Comms panel */}
             <section className="comms-panel">
                 <div className="comms-header">
@@ -282,49 +325,6 @@ export function DannyStatus() {
                     )}
                 </div>
             </section>
-
-            {/* Check-in History */}
-            {status.history.length > 0 && (
-                <section className="history-panel">
-                    <div className="history-header">
-                        <div className="comms-dot" />
-                        Field Transmission Log
-                    </div>
-                    <div className="history-body">
-                        {status.history.map((entry) => {
-                            const rMs = typeof entry.remainingMs === 'number' ? entry.remainingMs : null;
-                            const rH = rMs !== null ? rMs / 3600000 : null;
-                            const tier = getHistoryTier(rH);
-                            const quip = rMs !== null
-                                ? getHistoryQuip(rMs, entry.timestamp)
-                                : 'First recorded transmission. The legend begins.';
-                            const d = new Date(entry.timestamp);
-
-                            return (
-                                <div key={entry.timestamp} className={`history-entry ${tier}`}>
-                                    <div className="history-entry-header">
-                                        <span className={`history-dot ${tier}`} />
-                                        <span className="history-date">
-                                            {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </span>
-                                        <span className="history-time">
-                                            {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })} UTC
-                                        </span>
-                                        <span className={`history-gap ${tier}`}>
-                                            {rH === null ? 'first'
-                                                : rH < 0 ? `${Math.abs(Math.round(rH))}h overdue`
-                                                : rH < 1 ? `${Math.max(1, Math.round((rMs ?? 0) / 60000))}m left`
-                                                : `${Math.round(rH)}h left`
-                                            }
-                                        </span>
-                                    </div>
-                                    <div className={`history-quip ${tier}`}>{quip}</div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </section>
-            )}
 
             {/* Footer */}
             <footer className="footer">
