@@ -24,26 +24,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // Verify wallet address is authorized
         if (!ALLOWED_ADDRESSES.some(a => address.toLowerCase() === a.toLowerCase())) {
             return res.status(403).json({ error: 'Unauthorized wallet' });
         }
 
-        // Verify timestamp is recent (within 5 minutes)
         const now = Date.now();
         if (Math.abs(now - timestamp) > 5 * 60 * 1000) {
             return res.status(400).json({ error: 'Timestamp too old' });
         }
 
-        // Verify message format
         if (!message.startsWith('Danny is alive. Timestamp:')) {
             return res.status(400).json({ error: 'Invalid message format' });
         }
-
-        // Note: Full cryptographic signature verification requires the public key
-        // and Bitcoin message signing libraries. The wallet address check + signed
-        // message from OPWallet provides authentication (wallet can only sign if
-        // it holds the private key for the address).
 
         if (!REDIS_URL || !REDIS_TOKEN) {
             return res.status(200).json({
@@ -55,14 +47,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const redis = new Redis({ url: REDIS_URL, token: REDIS_TOKEN });
 
-        // Fetch previous check-in to compute remaining window
+        // Fetch previous check-in to compute gap
         const prev = await redis.get<{ lastCheckin: number }>('danny:checkin');
-        const WINDOW_MS = 24 * 60 * 60 * 1000;
-        let remainingMs = WINDOW_MS; // first check-in: full window
-        if (prev?.lastCheckin) {
-            const deadline = prev.lastCheckin + WINDOW_MS;
-            remainingMs = deadline - timestamp; // negative = was overdue
-        }
+        const gap = prev?.lastCheckin ? timestamp - prev.lastCheckin : null;
 
         // Store current check-in
         await redis.set('danny:checkin', {
@@ -73,10 +60,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             recordedAt: now,
         });
 
-        // Push to history list (newest first, cap at 50)
-        const record = { timestamp, address, remainingMs };
+        // Push to history list (newest first, cap at 200)
+        const record = { timestamp, address, gap };
         await redis.lpush('danny:checkin:history', record);
-        await redis.ltrim('danny:checkin:history', 0, 49);
+        await redis.ltrim('danny:checkin:history', 0, 199);
 
         return res.status(200).json({ ok: true, lastCheckin: timestamp });
     } catch (err) {

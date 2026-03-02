@@ -1,5 +1,5 @@
 import { useWalletConnect, SupportedWallets } from '@btc-vision/walletconnect';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 
 const ALLOWED_ADDRESSES = [
     'opt1pp4j4gpqh2qesaz0uhs0rnu4n4q2xlj7cpgqqep2kl0g9fysd3lss2n0e0t',
@@ -7,17 +7,16 @@ const ALLOWED_ADDRESSES = [
 ];
 const CHECKIN_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-interface HistoryEntry {
-    timestamp: number;
-    address: string;
-    /** ms remaining in the 24h window at check-in time (negative = overdue) */
-    remainingMs: number;
-}
-
 interface StatusData {
     lastCheckin: number | null;
     message: string | null;
-    history: HistoryEntry[];
+}
+
+interface CheckinRecord {
+    timestamp: number;
+    address: string;
+    /** milliseconds since previous check-in (null for first ever) */
+    gap: number | null;
 }
 
 export function DannyStatus() {
@@ -30,7 +29,8 @@ export function DannyStatus() {
         openConnectModal,
     } = useWalletConnect();
 
-    const [status, setStatus] = useState<StatusData>({ lastCheckin: null, message: null, history: [] });
+    const [status, setStatus] = useState<StatusData>({ lastCheckin: null, message: null });
+    const [checkinLog, setCheckinLog] = useState<CheckinRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [signing, setSigning] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -38,6 +38,7 @@ export function DannyStatus() {
 
     useEffect(() => {
         fetchStatus();
+        fetchHistory();
         const interval = setInterval(fetchStatus, 30000);
         return () => clearInterval(interval);
     }, []);
@@ -49,17 +50,24 @@ export function DannyStatus() {
             setStatus({
                 lastCheckin: data.lastCheckin ?? null,
                 message: data.message ?? null,
-                history: data.history ?? [],
             });
         } catch {
             const stored = localStorage.getItem('danny_checkin');
             if (stored) {
                 const parsed = JSON.parse(stored);
-                setStatus({ lastCheckin: parsed.lastCheckin, message: parsed.message, history: [] });
+                setStatus({ lastCheckin: parsed.lastCheckin, message: parsed.message });
             }
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchHistory = async () => {
+        try {
+            const res = await fetch('/api/history?limit=50');
+            const data = await res.json();
+            if (data.history) setCheckinLog(data.history);
+        } catch { /* history is non-critical */ }
     };
 
     const isDanny = ALLOWED_ADDRESSES.some(a => walletAddress?.toLowerCase() === a.toLowerCase());
@@ -94,10 +102,10 @@ export function DannyStatus() {
                         address: walletAddress,
                     }),
                 });
-                if (res.ok) { setSuccess(true); await fetchStatus(); return; }
+                if (res.ok) { setSuccess(true); await fetchStatus(); await fetchHistory(); return; }
             } catch { /* API not available */ }
 
-            const data: StatusData = { lastCheckin: timestamp, message, history: status.history };
+            const data: StatusData = { lastCheckin: timestamp, message };
             localStorage.setItem('danny_checkin', JSON.stringify(data));
             setStatus(data);
             setSuccess(true);
@@ -234,6 +242,21 @@ export function DannyStatus() {
                 </div>
             </main>
 
+            {/* Check-in history */}
+            {checkinLog.length > 0 && (
+                <section className="history-panel">
+                    <div className="history-header">
+                        <div className="comms-dot" />
+                        Transmission Log
+                    </div>
+                    <div className="history-body">
+                        {checkinLog.map((entry, i) => (
+                            <HistoryRow key={entry.timestamp} record={entry} index={i} total={checkinLog.length} />
+                        ))}
+                    </div>
+                </section>
+            )}
+
             {/* Comms panel */}
             <section className="comms-panel">
                 <div className="comms-header">
@@ -283,48 +306,6 @@ export function DannyStatus() {
                 </div>
             </section>
 
-            {/* Check-in History */}
-            {status.history.length > 0 && (
-                <section className="history-panel">
-                    <div className="history-header">
-                        <div className="comms-dot" />
-                        Field Transmission Log
-                    </div>
-                    <div className="history-body">
-                        {status.history.map((entry, i) => {
-                            const remainingH = entry.remainingMs / 3600000;
-                            const comment = getHistoryQuip(entry.remainingMs, entry.timestamp);
-                            const tier = remainingH < 0 ? 'overdue'
-                                : remainingH < 1 ? 'critical'
-                                : remainingH < 4 ? 'close'
-                                : remainingH < 12 ? 'moderate'
-                                : 'comfortable';
-
-                            return (
-                                <div key={entry.timestamp} className={`history-entry ${tier}`}>
-                                    <div className="history-row">
-                                        <span className={`history-dot dot-${tier}`} />
-                                        <span className="history-time">
-                                            {formatHistoryDate(entry.timestamp)}
-                                        </span>
-                                        <span className={`history-remaining remaining-${tier}`}>
-                                            {remainingH < 0
-                                                ? `${Math.abs(Math.round(remainingH))}h overdue`
-                                                : remainingH < 1
-                                                ? `${Math.round(entry.remainingMs / 60000)}m left`
-                                                : `${Math.round(remainingH)}h left`
-                                            }
-                                        </span>
-                                    </div>
-                                    <div className="history-comment">{comment}</div>
-                                    {i < status.history.length - 1 && <div className="history-divider" />}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </section>
-            )}
-
             {/* Footer */}
             <footer className="footer">
                 <div className="footer-line" />
@@ -338,6 +319,187 @@ export function DannyStatus() {
             </footer>
         </div>
     );
+}
+
+/* ── History row component ── */
+function HistoryRow({ record, index, total }: { record: CheckinRecord; index: number; total: number }) {
+    const date = new Date(record.timestamp);
+    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+    const gapHours = record.gap !== null ? record.gap / 3600000 : null;
+    const quip = useMemo(() => getHistoryQuip(gapHours, index, total), [gapHours, index, total]);
+    const urgencyClass = getUrgencyClass(gapHours);
+
+    return (
+        <div className={`history-entry ${urgencyClass}`}>
+            <div className="history-entry-header">
+                <span className={`history-dot ${urgencyClass}`} />
+                <span className="history-date">{dateStr}</span>
+                <span className="history-time">{timeStr} UTC</span>
+                {gapHours !== null && (
+                    <span className={`history-gap ${urgencyClass}`}>
+                        {formatGap(record.gap!)}
+                    </span>
+                )}
+            </div>
+            <div className={`history-quip ${urgencyClass}`}>{quip}</div>
+        </div>
+    );
+}
+
+/* ── History helpers ── */
+function getUrgencyClass(gapHours: number | null): string {
+    if (gapHours === null) return 'first';
+    if (gapHours > 24) return 'overdue';
+    if (gapHours > 22) return 'clutch';
+    if (gapHours > 18) return 'close';
+    if (gapHours > 12) return 'normal';
+    return 'early';
+}
+
+function formatGap(ms: number): string {
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    if (h > 48) return `${Math.floor(h / 24)}d ${h % 24}h gap`;
+    if (h > 0) return `${h}h ${m}m gap`;
+    return `${m}m gap`;
+}
+
+function getHistoryQuip(gapHours: number | null, index: number, total: number): string {
+    // Deterministic "random" pick based on position
+    const pick = (arr: string[]) => arr[(index * 7 + total) % arr.length];
+
+    // First ever check-in
+    if (gapHours === null) {
+        return pick([
+            'The first transmission. The legend begins.',
+            'Day zero. The protocol awakens.',
+            'Genesis signal. History in the making.',
+            'The very first proof of life. How touching.',
+        ]);
+    }
+
+    // Overdue — came back from the dead (gap > 24h)
+    if (gapHours > 48) {
+        return pick([
+            'Rose from the grave. The community can unclench now.',
+            'Back from the shadow realm. We had the funeral planned.',
+            'Plot twist: he lives. Cancel the memorial.',
+            'The obituary was drafted. DRAFTED.',
+            'Lazarus has nothing on this comeback.',
+        ]);
+    }
+    if (gapHours > 24) {
+        return pick([
+            'Technically late. We technically panicked.',
+            'Overdue but alive. The eulogy goes back in the drawer.',
+            'The MIA stamp was mid-swing. Saved by milliseconds. Sort of.',
+            'Came back from the dead. Casually.',
+            'The flatline was out. Danny said "not today."',
+        ]);
+    }
+
+    // Last-minute clutch (22-24h)
+    if (gapHours > 23) {
+        return pick([
+            'THAT WAS A CLOSE ONE. Community collective heart attack averted.',
+            'Under an hour to spare. The audacity.',
+            'Cutting it so fine you could shave with it.',
+            'The MIA stamp was LOADED. Danny chose violence on our nerves.',
+            'Speedrun: how close can you get without triggering a crisis.',
+        ]);
+    }
+    if (gapHours > 22) {
+        return pick([
+            'Two hours to spare. Is this a hobby? Stressing us out?',
+            'Close call. The heartbeat monitor was already stuttering.',
+            'Danny enjoys watching the countdown. That much is clear.',
+            'Nearly gave the protocol a reason to exist.',
+            'Living on the edge. Literally.',
+        ]);
+    }
+
+    // Getting close (18-22h)
+    if (gapHours > 20) {
+        return pick([
+            'Starting to sweat. But made it. Barely.',
+            'Four hours to spare. Generous by Danny standards.',
+            'The amber light was on. Danny noticed. Eventually.',
+            'We were THIS close to sending a search party.',
+        ]);
+    }
+    if (gapHours > 18) {
+        return pick([
+            'Waited long enough to make it interesting.',
+            'Six hours to spare. The community exhales.',
+            'Not early, not late. Fashionably punctual.',
+            'Took the scenic route but got there.',
+        ]);
+    }
+
+    // Normal timing (12-18h)
+    if (gapHours > 15) {
+        return pick([
+            'Right on schedule. Boring. We love it.',
+            'Comfortable timing. Nobody sweated. For once.',
+            'The definition of "yeah I got this."',
+            'Unremarkably alive. The best kind of alive.',
+        ]);
+    }
+    if (gapHours > 12) {
+        return pick([
+            'Half a window used. Solid. Responsible even.',
+            'Danny woke up and chose responsibility. Rare.',
+            'The protocol nods approvingly. This is fine.',
+            'A perfectly mid-window check-in. *chef\'s kiss*',
+        ]);
+    }
+
+    // Early (6-12h)
+    if (gapHours > 8) {
+        return pick([
+            'Early bird gets to not give the community anxiety.',
+            'Checked in with time to spare. Showoff.',
+            'Someone had their coffee and felt productive.',
+            'Ahead of schedule. Suspicious but welcome.',
+        ]);
+    }
+    if (gapHours > 6) {
+        return pick([
+            'Impressively early. Did someone set an alarm?',
+            'Six hours. Danny is on a roll.',
+            'The protocol barely had time to start counting.',
+            'Overachiever energy. We\'re not complaining.',
+        ]);
+    }
+
+    // Very early (< 6h)
+    if (gapHours > 3) {
+        return pick([
+            'Barely waited. Someone\'s anxious.',
+            'Three hours? Danny, the window is 24. Relax.',
+            'Eager. Very eager. We respect it.',
+            'The check-in button: exists. Danny: *mashes repeatedly*',
+        ]);
+    }
+    if (gapHours > 1) {
+        return pick([
+            'An hour gap. Danny is speedrunning check-ins now.',
+            'The protocol just started and Danny is already back.',
+            'This is less "proof of life" and more "proof of no chill."',
+            'One hour. Calm down, Danny. We believe you.',
+        ]);
+    }
+
+    // Absurdly fast (< 1h)
+    return pick([
+        'Under an hour. Danny, it\'s not a competition. Or is it?',
+        'The button isn\'t going anywhere. Neither is Danny, apparently.',
+        'Speed-checking. A new extreme sport.',
+        'We get it. You\'re alive. Very alive.',
+        'At this rate, Danny will check in before checking out.',
+    ]);
 }
 
 /* ── Status quip (main display) ── */
@@ -559,98 +721,7 @@ function getAnimationSpeed(remainingHours: number): number {
     return 8;
 }
 
-function formatHistoryDate(timestamp: number): string {
-    const d = new Date(timestamp);
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const day = d.getUTCDate();
-    const mon = months[d.getUTCMonth()];
-    const h = d.getUTCHours().toString().padStart(2, '0');
-    const m = d.getUTCMinutes().toString().padStart(2, '0');
-    return `${mon} ${day}, ${h}:${m} UTC`;
-}
-
-/**
- * Ironic quip based on how much time was left when Danny checked in.
- * Uses timestamp as seed so each entry gets a stable quip.
- */
-function getHistoryQuip(remainingMs: number, seed: number): string {
-    const pick = (arr: string[]) => arr[seed % arr.length];
-    const remainingH = remainingMs / 3600000;
-
-    // ── OVERDUE: checked in after the window expired ──
-    if (remainingMs < 0) {
-        const overdueH = Math.abs(remainingH);
-        if (overdueH < 1) return pick([
-            'Technically dead for a few minutes there. Welcome back.',
-            'The MIA stamp was literally mid-air. That was TOO close.',
-            'Clinically deceased, then un-deceased. A medical miracle.',
-            'We had already started writing the obituary. Not kidding.',
-        ]);
-        if (overdueH < 4) return pick([
-            'Rose from the dead like it was casual. Hours overdue.',
-            'We were picking out memorial flowers. Glad we didn\'t commit.',
-            'The afterlife clearly has WiFi because he checked in from it.',
-            'Back from the shadow realm. Took his time about it too.',
-        ]);
-        return pick([
-            'Days overdue. Lazarus himself would be impressed.',
-            'We genuinely thought this was it. Danny said "lol no."',
-            'Resurrection speedrun: failed. But he made it eventually.',
-            'At this point we\'d already divided up his NFTs. Awkward.',
-        ]);
-    }
-
-    // ── CRITICAL: under 1 hour left ──
-    if (remainingH < 1) return pick([
-        'THAT WAS A CLOSE ONE. Minutes. MINUTES.',
-        'Checked in with the clock literally screaming. Heart attack material.',
-        'Clutched it at the buzzer. NBA Finals energy.',
-        'If this were a movie, the bomb timer would\'ve been at 00:03.',
-        'Speed ran the check-in. We can feel our blood pressure normalizing.',
-        'Photo finish. The MIA stamp was COCKED AND LOADED.',
-    ]);
-
-    // ── CLOSE: 1-4 hours left ──
-    if (remainingH < 4) return pick([
-        'That was a close one. Not "movie close," more like "heart palpitation close."',
-        'Cutting it fine, Danny. Real fine. Our nerves are shot.',
-        'Checked in with hours to spare. And by "hours" we mean barely.',
-        'The amber warning light was SCREAMING. Just saying.',
-        'Arrived fashionably late to his own alive-ness confirmation.',
-        'Danny likes to live dangerously. Ironic, given the context.',
-    ]);
-
-    // ── MODERATE: 4-12 hours left ──
-    if (remainingH < 12) return pick([
-        'Reasonable timing. Not great, not terrible. The Chernobyl of check-ins.',
-        'Half the window gone but who\'s counting. We are. Obsessively.',
-        'Showed up in the middle third. Very centrist of him.',
-        'Not early, not late. Aggressively average. We\'ll take it.',
-        'The clock was ticking loud enough to hear. Danny: "what clock?"',
-        'Solid B-minus effort on the timing front.',
-    ]);
-
-    // ── COMFORTABLE: 12-20 hours left ──
-    if (remainingH < 20) return pick([
-        'Early-ish. The community\'s collective anxiety barely registered.',
-        'Checked in before anyone started sweating. How considerate.',
-        'A responsible, timely check-in. Who is this person.',
-        'Plenty of time to spare. Almost suspiciously responsible.',
-        'Danny woke up and chose accountability. Unprecedented.',
-        'The green light didn\'t even flicker. Boring. (Thank God.)',
-    ]);
-
-    // ── FRESH: 20-24 hours left ──
-    return pick([
-        'Speedrun check-in. Danny hammered that button like rent was due.',
-        'Checked in so fast the previous check-in was still warm.',
-        'Eager. Almost too eager. Are we sure he\'s not a bot?',
-        'Immediate re-check-in. This man fears the MIA stamp.',
-        'Basically checked in before he even needed to. Overachiever.',
-        'Full 24 hours on the clock. Danny woke up and chose violence against doubt.',
-    ]);
-}
-
+/* ── Formatting helpers ── */
 function formatTimeSince(timestamp: number): string {
     const diff = Date.now() - timestamp;
     const hours = Math.floor(diff / 3600000);
