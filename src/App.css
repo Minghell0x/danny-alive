@@ -211,6 +211,13 @@ body {
     text-shadow: 0 0 30px var(--red-dim), 0 0 60px var(--red-dim);
     animation: status-flash 1.5s ease-in-out infinite;
 }
+.status-badge.warning {
+    color: var(--amber);
+    background: linear-gradient(180deg, rgba(255,170,0,0.08), transparent);
+    border: 1px solid rgba(255,170,0,0.4);
+    text-shadow: 0 0 30px rgba(255,170,0,0.3), 0 0 60px rgba(255,170,0,0.15);
+    animation: status-glow-amber 2s ease-in-out infinite;
+}
 .status-badge.loading {
     color: var(--amber);
     border: 1px solid rgba(255,170,0,0.3);
@@ -228,6 +235,11 @@ body {
     box-shadow: 0 0 10px var(--green), 0 0 20px var(--green-dim);
     animation: pulse-dot 1.5s ease-in-out infinite;
 }
+.status-indicator.warning {
+    background: var(--amber);
+    box-shadow: 0 0 10px var(--amber), 0 0 20px rgba(255,170,0,0.3);
+    animation: pulse-dot-amber 1.5s ease-in-out infinite;
+}
 .status-indicator.missing {
     background: var(--red);
     box-shadow: 0 0 10px var(--red);
@@ -237,6 +249,14 @@ body {
 @keyframes status-glow-green {
     0%, 100% { border-color: var(--green-mid); }
     50% { border-color: var(--green); }
+}
+@keyframes status-glow-amber {
+    0%, 100% { border-color: rgba(255,170,0,0.4); }
+    50% { border-color: var(--amber); }
+}
+@keyframes pulse-dot-amber {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.6; }
 }
 @keyframes status-flash {
     0%, 100% { opacity: 1; }
@@ -267,6 +287,10 @@ body {
 .quip-text.alive {
     color: var(--green);
     opacity: 0.8;
+}
+.quip-text.warning {
+    color: var(--amber);
+    opacity: 0.9;
 }
 .quip-text.missing {
     color: var(--red);
@@ -313,6 +337,9 @@ body {
 .intel-value.countdown {
     color: var(--green);
 }
+.intel-value.countdown-warn {
+    color: var(--amber);
+}
 .intel-value.expired {
     color: var(--red);
 }
@@ -336,6 +363,13 @@ body {
     fill: none;
     stroke-width: 1.5;
     stroke-linecap: round;
+}
+.radio-svg .signal-line.warning {
+    stroke: var(--amber);
+    filter: drop-shadow(0 0 3px var(--amber));
+    stroke-dasharray: 800;
+    stroke-dashoffset: 800;
+    animation: signal-sweep 3s linear infinite;
 }
 .radio-svg .signal-line.alive {
     stroke: var(--green);
@@ -583,6 +617,11 @@ body {
 @keyframes vignette-pulse {
     0%, 100% { opacity: 0.6; }
     50% { opacity: 1; }
+}
+.hc-amber {
+    border-color: var(--amber) !important;
+    color: var(--amber) !important;
+    animation: stamp-flash 2s ease-in-out infinite;
 }
 .hc-red {
     border-color: var(--red) !important;

@@ -100,7 +100,13 @@ export function DannyStatus() {
         return () => clearInterval(t);
     }, []);
 
-    const statusClass = loading ? 'loading' : isAlive ? 'alive' : 'missing';
+    const remaining = status.lastCheckin
+        ? (status.lastCheckin + CHECKIN_WINDOW_MS - Date.now()) / 3600000
+        : null;
+    const statusClass = loading ? 'loading'
+        : !isAlive ? 'missing'
+        : remaining !== null && remaining <= 24 ? 'warning'
+        : 'alive';
     const { quip, sub: quipSub } = loading
         ? { quip: '', sub: '' }
         : getStatusQuip(status.lastCheckin);
@@ -113,8 +119,8 @@ export function DannyStatus() {
 
             {/* Header */}
             <header className="header">
-                <div className={`header-classification ${statusClass === 'missing' ? 'hc-red' : ''}`}>
-                    {statusClass === 'missing' ? '⚠ ALERT ⚠' : 'CLASSIFIED'}
+                <div className={`header-classification ${statusClass === 'missing' ? 'hc-red' : statusClass === 'warning' ? 'hc-amber' : ''}`}>
+                    {statusClass === 'missing' ? '⚠ ALERT ⚠' : statusClass === 'warning' ? '⚠ CAUTION ⚠' : 'CLASSIFIED'}
                 </div>
                 <div className="header-title">OPNet Deadman Protocol</div>
                 <div className="header-sub">Field Operative Status Monitor</div>
@@ -164,7 +170,10 @@ export function DannyStatus() {
                 <div className="status-display">
                     <div className={`status-badge ${statusClass}`}>
                         <div className={`status-indicator ${statusClass}`} />
-                        {loading ? 'CHECKING...' : isAlive ? 'OPERATIVE ALIVE' : 'OPERATIVE MISSING'}
+                        {loading ? 'CHECKING...'
+                            : statusClass === 'missing' ? 'OPERATIVE MISSING'
+                            : statusClass === 'warning' ? 'SIGNAL FADING'
+                            : 'OPERATIVE ALIVE'}
                     </div>
                 </div>
 
@@ -184,7 +193,7 @@ export function DannyStatus() {
                     </div>
                     <div className="intel-cell">
                         <div className="intel-label">Window</div>
-                        <div className={`intel-value ${isAlive ? 'countdown' : 'expired'}`}>
+                        <div className={`intel-value ${!isAlive ? 'expired' : statusClass === 'warning' ? 'countdown-warn' : 'countdown'}`}>
                             {status.lastCheckin ? (isAlive ? timeLeft : 'EXPIRED') : '—'}
                         </div>
                     </div>
@@ -197,9 +206,9 @@ export function DannyStatus() {
                 {/* Signal line */}
                 <div className="radio-line">
                     <svg viewBox="0 0 500 40" className="radio-svg" preserveAspectRatio="none">
-                        {isAlive && !loading ? (
+                        {(isAlive || statusClass === 'warning') && !loading ? (
                             <polyline
-                                className="signal-line alive"
+                                className={`signal-line ${statusClass === 'warning' ? 'warning' : 'alive'}`}
                                 points="0,20 60,20 80,20 90,5 100,35 110,8 118,25 126,20 160,20 220,20 240,20 250,5 260,35 270,8 278,25 286,20 320,20 380,20 400,20 410,5 420,35 430,8 438,25 446,20 500,20"
                             />
                         ) : (
@@ -319,48 +328,48 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'No action required. But we wouldn\'t complain if Danny popped in.',
     };
 
-    // ── ALIVE: getting nervous (12h-24h) ──
+    // ── WARNING: under 24h (12h-24h remaining) ──
     if (remaining > 12) return {
         quip: pick([
-            'Under 24 hours remaining. We\'re not worried. You\'re worried.',
-            'Would be a great day for Danny to remember this website exists.',
-            'Clock\'s ticking. Casually. Very casually.',
-            'The window is narrowing. Like Danny\'s chances of remembering.',
+            'Under 24 hours. The signal is weakening. We can feel it.',
+            'Danny has not checked in for over a day. The protocol is watching.',
+            'The green light is flickering. It doesn\'t like what it sees.',
+            'We\'ve moved from "he\'s fine" to "he\'s probably fine." Note the probably.',
         ]),
-        sub: 'Totally not refreshing this page every 5 minutes.',
+        sub: 'This is the part where smart people start paying attention.',
     };
 
-    // ── ALIVE: sweating (6h-12h remaining = 36-42h elapsed) ──
+    // ── WARNING: under 12h (6h-12h remaining) ──
     if (remaining > 6) return {
         quip: pick([
-            'Under 12 hours. This is fine. Everything is fine.',
-            'Danny, if you\'re reading this... now would be good.',
-            'We\'re entering "should we text him?" territory.',
-            'The EKG line is getting nervous and honestly so are we.',
+            'Under 12 hours and the silence is getting loud.',
+            'Danny, if you\'re reading this, the window is closing and we\'re not joking anymore.',
+            'We\'re past "should we text him" and into "does anyone have his mom\'s number."',
+            'The heartbeat monitor is stuttering. Figuratively. For now.',
         ]),
-        sub: 'Someone check if Danny\'s phone is charged.',
+        sub: 'Genuinely starting to worry. Not a bit. Not a joke.',
     };
 
-    // ── ALIVE: panic mode (1h-6h) ──
+    // ── WARNING: critical (1h-6h remaining) ──
     if (remaining > 1) return {
         quip: pick([
-            'HOURS. Not days. HOURS.',
-            'Danny please. We are begging. The green dot needs you.',
-            'The countdown is giving anxiety and I\'m a website.',
-            'Community members are starting to draft eulogies. Just kidding. Maybe.',
+            'HOURS. Single digit hours. The kind that run out.',
+            'Danny we are not asking anymore. We are begging. Check in.',
+            'The countdown is giving the entire community a collective panic attack.',
+            'This is not a vibe check. This is a welfare check.',
         ]),
-        sub: 'Seriously Danny. One click. That\'s all we ask.',
+        sub: 'If you know Danny personally, now is the time to reach out.',
     };
 
-    // ── ALIVE: final hour (<1h) ──
+    // ── WARNING: final hour (<1h remaining) ──
     if (remaining > 0) return {
         quip: pick([
-            'UNDER ONE HOUR. THIS IS NOT A DRILL.',
-            'Danny. DANNY. The button. Press it. NOW.',
-            'We can see the light at the end of the tunnel and it\'s red.',
-            'The MIA stamp is warming up. It\'s stretching. It\'s ready.',
+            'UNDER ONE HOUR. THIS IS NOT A DRILL. REPEAT: NOT A DRILL.',
+            'Danny. DANNY. The button. PRESS IT. The red stamp is LOADED.',
+            'Minutes. We are counting in MINUTES now. Do you understand.',
+            'The MIA stamp is inked, cocked, and ready to fire. One hour.',
         ]),
-        sub: 'Every second counts. Literally. Look at the countdown.',
+        sub: 'Every second that passes is a second closer to MIA status. Move.',
     };
 
     // ── MISSING: just expired (0-2h overdue) ──
