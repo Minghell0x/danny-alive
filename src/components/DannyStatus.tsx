@@ -7,9 +7,17 @@ const ALLOWED_ADDRESSES = [
 ];
 const CHECKIN_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+interface HistoryEntry {
+    timestamp: number;
+    address: string;
+    /** ms remaining in the 24h window at check-in time (negative = overdue) */
+    remainingMs: number;
+}
+
 interface StatusData {
     lastCheckin: number | null;
     message: string | null;
+    history: HistoryEntry[];
 }
 
 export function DannyStatus() {
@@ -22,7 +30,7 @@ export function DannyStatus() {
         openConnectModal,
     } = useWalletConnect();
 
-    const [status, setStatus] = useState<StatusData>({ lastCheckin: null, message: null });
+    const [status, setStatus] = useState<StatusData>({ lastCheckin: null, message: null, history: [] });
     const [loading, setLoading] = useState(true);
     const [signing, setSigning] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -38,10 +46,17 @@ export function DannyStatus() {
         try {
             const res = await fetch('/api/status');
             const data = await res.json();
-            setStatus(data);
+            setStatus({
+                lastCheckin: data.lastCheckin ?? null,
+                message: data.message ?? null,
+                history: data.history ?? [],
+            });
         } catch {
             const stored = localStorage.getItem('danny_checkin');
-            if (stored) setStatus(JSON.parse(stored));
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                setStatus({ lastCheckin: parsed.lastCheckin, message: parsed.message, history: [] });
+            }
         } finally {
             setLoading(false);
         }
@@ -82,7 +97,7 @@ export function DannyStatus() {
                 if (res.ok) { setSuccess(true); await fetchStatus(); return; }
             } catch { /* API not available */ }
 
-            const data: StatusData = { lastCheckin: timestamp, message };
+            const data: StatusData = { lastCheckin: timestamp, message, history: status.history };
             localStorage.setItem('danny_checkin', JSON.stringify(data));
             setStatus(data);
             setSuccess(true);
@@ -268,6 +283,48 @@ export function DannyStatus() {
                 </div>
             </section>
 
+            {/* Check-in History */}
+            {status.history.length > 0 && (
+                <section className="history-panel">
+                    <div className="history-header">
+                        <div className="comms-dot" />
+                        Field Transmission Log
+                    </div>
+                    <div className="history-body">
+                        {status.history.map((entry, i) => {
+                            const remainingH = entry.remainingMs / 3600000;
+                            const comment = getHistoryQuip(entry.remainingMs, entry.timestamp);
+                            const tier = remainingH < 0 ? 'overdue'
+                                : remainingH < 1 ? 'critical'
+                                : remainingH < 4 ? 'close'
+                                : remainingH < 12 ? 'moderate'
+                                : 'comfortable';
+
+                            return (
+                                <div key={entry.timestamp} className={`history-entry ${tier}`}>
+                                    <div className="history-row">
+                                        <span className={`history-dot dot-${tier}`} />
+                                        <span className="history-time">
+                                            {formatHistoryDate(entry.timestamp)}
+                                        </span>
+                                        <span className={`history-remaining remaining-${tier}`}>
+                                            {remainingH < 0
+                                                ? `${Math.abs(Math.round(remainingH))}h overdue`
+                                                : remainingH < 1
+                                                ? `${Math.round(entry.remainingMs / 60000)}m left`
+                                                : `${Math.round(remainingH)}h left`
+                                            }
+                                        </span>
+                                    </div>
+                                    <div className="history-comment">{comment}</div>
+                                    {i < status.history.length - 1 && <div className="history-divider" />}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+            )}
+
             {/* Footer */}
             <footer className="footer">
                 <div className="footer-line" />
@@ -283,6 +340,7 @@ export function DannyStatus() {
     );
 }
 
+/* ── Status quip (main display) ── */
 function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string } {
     if (lastCheckin === null) {
         return {
@@ -295,11 +353,9 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
     const hoursElapsed = elapsed / 3600000;
     const remaining = 24 - hoursElapsed;
 
-    // Rotate quips per minute so they don't flicker every second
     const minute = Math.floor(Date.now() / 60000);
     const pick = (arr: string[]) => arr[minute % arr.length];
 
-    // ── ALIVE: fresh (20h-24h remaining = 0-4h elapsed) ──
     if (remaining > 20) return {
         quip: pick([
             'All systems nominal. Danny is presumably alive and doing Danny things.',
@@ -309,7 +365,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Check-in window is wide open. Nothing to see here.',
     };
 
-    // ── ALIVE: comfortable (16h-20h remaining = 4-8h elapsed) ──
     if (remaining > 16) return {
         quip: pick([
             'Still well within parameters. Relax.',
@@ -319,7 +374,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Status: unremarkably alive.',
     };
 
-    // ── ALIVE: cruising (12h-16h remaining = 8-12h elapsed) ──
     if (remaining > 12) return {
         quip: pick([
             'Clock is running. Nothing dramatic. Just... running.',
@@ -329,7 +383,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'No action required. But we wouldn\'t complain if Danny popped in.',
     };
 
-    // ── WARNING: under 12h (8h-12h remaining) ──
     if (remaining > 8) return {
         quip: pick([
             'Under 12 hours. The signal is weakening. We can feel it.',
@@ -340,7 +393,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'This is the part where smart people start paying attention.',
     };
 
-    // ── WARNING: under 8h (4h-8h remaining) ──
     if (remaining > 4) return {
         quip: pick([
             'Under 8 hours and the silence is getting loud.',
@@ -351,7 +403,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Genuinely starting to worry. Not a bit. Not a joke.',
     };
 
-    // ── WARNING: critical (1h-4h remaining) ──
     if (remaining > 1) return {
         quip: pick([
             'HOURS. The kind that run out. Fast.',
@@ -362,7 +413,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'If you know Danny personally, now is the time to reach out.',
     };
 
-    // ── WARNING: final hour (<1h remaining) ──
     if (remaining > 0) return {
         quip: pick([
             'UNDER ONE HOUR. THIS IS NOT A DRILL. REPEAT: NOT A DRILL.',
@@ -373,7 +423,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Every second that passes is a second closer to MIA status. Move.',
     };
 
-    // ── MISSING: just expired (0-1h overdue) ──
     const overdue = hoursElapsed - 24;
     if (overdue < 1) return {
         quip: pick([
@@ -384,7 +433,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Give it a minute. Or 60 of them.',
     };
 
-    // ── MISSING: few hours (1-4h overdue) ──
     if (overdue < 4) return {
         quip: pick([
             'His phone probably died. Phones die all the time. Right? RIGHT?',
@@ -395,7 +443,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'We\'re not worried. This is our not-worried face.',
     };
 
-    // ── MISSING: half day (4-12h overdue) ──
     if (overdue < 12) return {
         quip: pick([
             'Starting to rehearse "I\'m sure he\'s fine" with less conviction.',
@@ -406,7 +453,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'The community is asking questions. We don\'t have answers.',
     };
 
-    // ── MISSING: one day (12-24h overdue) ──
     if (overdue < 24) return {
         quip: pick([
             'This is fine. 🔥 Everything is fine. 🔥🔥',
@@ -417,7 +463,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Someone go knock on his door. Does anyone know where he lives? Asking for a protocol.',
     };
 
-    // ── MISSING: two days (24-48h overdue) ──
     if (overdue < 48) return {
         quip: pick([
             'Two days without contact. We\'ve moved past denial into bargaining.',
@@ -428,7 +473,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'At this point we\'d accept a smoke signal.',
     };
 
-    // ── MISSING: 3+ days (48-72h overdue) ──
     if (overdue < 72) return {
         quip: pick([
             'Three days. Even Jesus came back after three days. Just saying.',
@@ -439,7 +483,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'OPNet is running itself apparently.',
     };
 
-    // ── MISSING: 1 week (72-168h overdue) ──
     if (overdue < 168) return {
         quip: pick([
             'It\'s been a week. We\'ve named the flatline. His name is Gerald.',
@@ -450,7 +493,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'Send help. Or Danny. Preferably Danny.',
     };
 
-    // ── MISSING: 2+ weeks (168h+ overdue) ──
     if (overdue < 720) return {
         quip: pick([
             'We\'ve entered archaeological timescales. Future civilizations will study this.',
@@ -461,7 +503,6 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         sub: 'This page has become a memorial. Unintentionally.',
     };
 
-    // ── MISSING: 30+ days ──
     return {
         quip: pick([
             'At this point this website is basically a digital tombstone.',
@@ -473,17 +514,13 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
     };
 }
 
-/**
- * Generate SVG polyline points for heartbeat based on remaining hours.
- * More beats when healthy, fewer as window closes.
- */
+/* ── SVG helpers ── */
 function generateHeartbeatPoints(remainingHours: number): string {
     const W = 500;
     const MID = 20;
 
-    // Determine beat count + intensity based on remaining time
     let beats: number;
-    let amplitude: number; // peak deviation from midline
+    let amplitude: number;
     if (remainingHours > 20)      { beats = 6; amplitude = 16; }
     else if (remainingHours > 16) { beats = 5; amplitude = 15; }
     else if (remainingHours > 12) { beats = 4; amplitude = 14; }
@@ -495,24 +532,16 @@ function generateHeartbeatPoints(remainingHours: number): string {
     if (beats === 0) return `0,${MID} ${W},${MID}`;
 
     const points: string[] = [`0,${MID}`];
-
-    // Spread beats evenly across the width
     const spacing = W / (beats + 1);
 
     for (let i = 1; i <= beats; i++) {
         const cx = Math.round(spacing * i);
-
-        // Lead-in flat segment
         points.push(`${cx - 14},${MID}`);
-
-        // QRS complex: sharp spike up, deep down, recover up, settle
         points.push(`${cx - 8},${MID}`);
-        points.push(`${cx - 4},${MID - amplitude}`);      // R peak (up)
-        points.push(`${cx},${MID + Math.round(amplitude * 0.85)}`);  // S valley (down)
-        points.push(`${cx + 5},${MID - Math.round(amplitude * 0.4)}`); // small bounce
+        points.push(`${cx - 4},${MID - amplitude}`);
+        points.push(`${cx},${MID + Math.round(amplitude * 0.85)}`);
+        points.push(`${cx + 5},${MID - Math.round(amplitude * 0.4)}`);
         points.push(`${cx + 9},${MID}`);
-
-        // Trail-out flat
         points.push(`${cx + 14},${MID}`);
     }
 
@@ -520,9 +549,6 @@ function generateHeartbeatPoints(remainingHours: number): string {
     return points.join(' ');
 }
 
-/**
- * Animation sweep speed: slower as beats decrease (more dramatic pauses).
- */
 function getAnimationSpeed(remainingHours: number): number {
     if (remainingHours > 20) return 2;
     if (remainingHours > 16) return 2.5;
@@ -530,7 +556,99 @@ function getAnimationSpeed(remainingHours: number): number {
     if (remainingHours > 8)  return 3.5;
     if (remainingHours > 4)  return 4.5;
     if (remainingHours > 1)  return 6;
-    return 8; // final hour: painfully slow single blip
+    return 8;
+}
+
+function formatHistoryDate(timestamp: number): string {
+    const d = new Date(timestamp);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const day = d.getUTCDate();
+    const mon = months[d.getUTCMonth()];
+    const h = d.getUTCHours().toString().padStart(2, '0');
+    const m = d.getUTCMinutes().toString().padStart(2, '0');
+    return `${mon} ${day}, ${h}:${m} UTC`;
+}
+
+/**
+ * Ironic quip based on how much time was left when Danny checked in.
+ * Uses timestamp as seed so each entry gets a stable quip.
+ */
+function getHistoryQuip(remainingMs: number, seed: number): string {
+    const pick = (arr: string[]) => arr[seed % arr.length];
+    const remainingH = remainingMs / 3600000;
+
+    // ── OVERDUE: checked in after the window expired ──
+    if (remainingMs < 0) {
+        const overdueH = Math.abs(remainingH);
+        if (overdueH < 1) return pick([
+            'Technically dead for a few minutes there. Welcome back.',
+            'The MIA stamp was literally mid-air. That was TOO close.',
+            'Clinically deceased, then un-deceased. A medical miracle.',
+            'We had already started writing the obituary. Not kidding.',
+        ]);
+        if (overdueH < 4) return pick([
+            'Rose from the dead like it was casual. Hours overdue.',
+            'We were picking out memorial flowers. Glad we didn\'t commit.',
+            'The afterlife clearly has WiFi because he checked in from it.',
+            'Back from the shadow realm. Took his time about it too.',
+        ]);
+        return pick([
+            'Days overdue. Lazarus himself would be impressed.',
+            'We genuinely thought this was it. Danny said "lol no."',
+            'Resurrection speedrun: failed. But he made it eventually.',
+            'At this point we\'d already divided up his NFTs. Awkward.',
+        ]);
+    }
+
+    // ── CRITICAL: under 1 hour left ──
+    if (remainingH < 1) return pick([
+        'THAT WAS A CLOSE ONE. Minutes. MINUTES.',
+        'Checked in with the clock literally screaming. Heart attack material.',
+        'Clutched it at the buzzer. NBA Finals energy.',
+        'If this were a movie, the bomb timer would\'ve been at 00:03.',
+        'Speed ran the check-in. We can feel our blood pressure normalizing.',
+        'Photo finish. The MIA stamp was COCKED AND LOADED.',
+    ]);
+
+    // ── CLOSE: 1-4 hours left ──
+    if (remainingH < 4) return pick([
+        'That was a close one. Not "movie close," more like "heart palpitation close."',
+        'Cutting it fine, Danny. Real fine. Our nerves are shot.',
+        'Checked in with hours to spare. And by "hours" we mean barely.',
+        'The amber warning light was SCREAMING. Just saying.',
+        'Arrived fashionably late to his own alive-ness confirmation.',
+        'Danny likes to live dangerously. Ironic, given the context.',
+    ]);
+
+    // ── MODERATE: 4-12 hours left ──
+    if (remainingH < 12) return pick([
+        'Reasonable timing. Not great, not terrible. The Chernobyl of check-ins.',
+        'Half the window gone but who\'s counting. We are. Obsessively.',
+        'Showed up in the middle third. Very centrist of him.',
+        'Not early, not late. Aggressively average. We\'ll take it.',
+        'The clock was ticking loud enough to hear. Danny: "what clock?"',
+        'Solid B-minus effort on the timing front.',
+    ]);
+
+    // ── COMFORTABLE: 12-20 hours left ──
+    if (remainingH < 20) return pick([
+        'Early-ish. The community\'s collective anxiety barely registered.',
+        'Checked in before anyone started sweating. How considerate.',
+        'A responsible, timely check-in. Who is this person.',
+        'Plenty of time to spare. Almost suspiciously responsible.',
+        'Danny woke up and chose accountability. Unprecedented.',
+        'The green light didn\'t even flicker. Boring. (Thank God.)',
+    ]);
+
+    // ── FRESH: 20-24 hours left ──
+    return pick([
+        'Speedrun check-in. Danny hammered that button like rent was due.',
+        'Checked in so fast the previous check-in was still warm.',
+        'Eager. Almost too eager. Are we sure he\'s not a bot?',
+        'Immediate re-check-in. This man fears the MIA stamp.',
+        'Basically checked in before he even needed to. Overachiever.',
+        'Full 24 hours on the clock. Danny woke up and chose violence against doubt.',
+    ]);
 }
 
 function formatTimeSince(timestamp: number): string {

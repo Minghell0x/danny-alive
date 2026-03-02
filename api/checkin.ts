@@ -54,6 +54,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const redis = new Redis({ url: REDIS_URL, token: REDIS_TOKEN });
+
+        // Fetch previous check-in to compute remaining window
+        const prev = await redis.get<{ lastCheckin: number }>('danny:checkin');
+        const WINDOW_MS = 24 * 60 * 60 * 1000;
+        let remainingMs = WINDOW_MS; // first check-in: full window
+        if (prev?.lastCheckin) {
+            const deadline = prev.lastCheckin + WINDOW_MS;
+            remainingMs = deadline - timestamp; // negative = was overdue
+        }
+
+        // Store current check-in
         await redis.set('danny:checkin', {
             lastCheckin: timestamp,
             message,
@@ -61,6 +72,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             address,
             recordedAt: now,
         });
+
+        // Push to history list (newest first, cap at 50)
+        const record = { timestamp, address, remainingMs };
+        await redis.lpush('danny:checkin:history', record);
+        await redis.ltrim('danny:checkin:history', 0, 49);
 
         return res.status(200).json({ ok: true, lastCheckin: timestamp });
     } catch (err) {
