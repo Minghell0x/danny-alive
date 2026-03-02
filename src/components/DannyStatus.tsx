@@ -291,36 +291,34 @@ export function DannyStatus() {
                         Field Transmission Log
                     </div>
                     <div className="history-body">
-                        {status.history.map((entry, i) => {
+                        {status.history.map((entry) => {
                             const rMs = typeof entry.remainingMs === 'number' ? entry.remainingMs : null;
                             const rH = rMs !== null ? rMs / 3600000 : null;
-                            const comment = rMs !== null
+                            const tier = getHistoryTier(rH);
+                            const quip = rMs !== null
                                 ? getHistoryQuip(rMs, entry.timestamp)
                                 : 'First recorded transmission. The legend begins.';
-                            const tier = rH === null ? 'comfortable'
-                                : rH < 0 ? 'overdue'
-                                : rH < 1 ? 'critical'
-                                : rH < 4 ? 'close'
-                                : rH < 12 ? 'moderate'
-                                : 'comfortable';
+                            const d = new Date(entry.timestamp);
 
                             return (
                                 <div key={entry.timestamp} className={`history-entry ${tier}`}>
-                                    <div className="history-row">
-                                        <span className={`history-dot dot-${tier}`} />
-                                        <span className="history-time">
-                                            {formatHistoryDate(entry.timestamp)}
+                                    <div className="history-entry-header">
+                                        <span className={`history-dot ${tier}`} />
+                                        <span className="history-date">
+                                            {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                         </span>
-                                        <span className={`history-remaining remaining-${tier}`}>
-                                            {rH === null ? '—'
+                                        <span className="history-time">
+                                            {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })} UTC
+                                        </span>
+                                        <span className={`history-gap ${tier}`}>
+                                            {rH === null ? 'first'
                                                 : rH < 0 ? `${Math.abs(Math.round(rH))}h overdue`
                                                 : rH < 1 ? `${Math.max(1, Math.round((rMs ?? 0) / 60000))}m left`
                                                 : `${Math.round(rH)}h left`
                                             }
                                         </span>
                                     </div>
-                                    <div className="history-comment">{comment}</div>
-                                    {i < status.history.length - 1 && <div className="history-divider" />}
+                                    <div className={`history-quip ${tier}`}>{quip}</div>
                                 </div>
                             );
                         })}
@@ -347,11 +345,15 @@ export function DannyStatus() {
    History quips — based on remainingMs (time LEFT in window)
    ════════════════════════════════════════════════════════════════ */
 
-function formatHistoryDate(timestamp: number): string {
-    const d = new Date(timestamp);
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return `${months[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCHours().toString().padStart(2,'0')}:${d.getUTCMinutes().toString().padStart(2,'0')} UTC`;
+function getHistoryTier(rH: number | null): string {
+    if (rH === null) return 'first';
+    if (rH < 0) return 'overdue';
+    if (rH < 2) return 'clutch';
+    if (rH < 4) return 'close';
+    if (rH < 12) return 'normal';
+    return 'early';
 }
+
 
 function getHistoryQuip(remainingMs: number, seed: number): string {
     const pick = (arr: string[]) => arr[Math.abs(seed) % arr.length];
