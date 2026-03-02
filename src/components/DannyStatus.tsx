@@ -253,12 +253,11 @@ export function DannyStatus() {
                         </div>
                         <div className="history-body">
                             {visible.map((entry) => {
+                                const globalIdx = status.history.indexOf(entry);
                                 const rMs = typeof entry.remainingMs === 'number' ? entry.remainingMs : null;
                                 const rH = rMs !== null ? rMs / 3600000 : null;
                                 const tier = getHistoryTier(rH);
-                                const quip = rMs !== null
-                                    ? getHistoryQuip(rMs, entry.timestamp)
-                                    : 'First recorded transmission. The legend begins.';
+                                const quip = getHistoryQuip(rMs, entry.timestamp, status.history, globalIdx);
                                 const d = new Date(entry.timestamp);
 
                                 return (
@@ -391,81 +390,210 @@ function getHistoryTier(rH: number | null): string {
 }
 
 
-function getHistoryQuip(remainingMs: number, seed: number): string {
+function getHistoryQuip(
+    remainingMs: number | null,
+    seed: number,
+    history: HistoryEntry[],
+    index: number,
+): string {
     const pick = (arr: string[]) => arr[Math.abs(seed) % arr.length];
+
+    // First ever check-in
+    if (remainingMs === null || history.length === 0) {
+        return pick([
+            'The first transmission. The legend begins. The anxiety begins harder.',
+            'Day zero. The protocol awakens. It will never sleep again.',
+            'Genesis signal. We had no idea what we were signing up for.',
+            'The very first proof of life. We were so innocent back then.',
+        ]);
+    }
+
     const rH = remainingMs / 3600000;
+
+    // ── Context analysis ──
+    // Previous entry is index+1 (history is newest-first)
+    const prev = index < history.length - 1 ? history[index + 1] : null;
+    const prevRH = prev?.remainingMs != null ? prev.remainingMs / 3600000 : null;
+
+    // Pattern detection
+    const recentEntries = history.slice(Math.max(0, index - 4), index + 1);
+    const closeCallCount = recentEntries.filter(e => e.remainingMs != null && e.remainingMs < 4 * 3600000).length;
+    const _overdueCount = recentEntries.filter(e => e.remainingMs != null && e.remainingMs < 0).length; void _overdueCount;
+    const earlyCount = recentEntries.filter(e => e.remainingMs != null && e.remainingMs > 12 * 3600000).length;
+    const isImprovement = prevRH !== null && rH > prevRH;
+    const isWorse = prevRH !== null && rH < prevRH;
+    const wasOverdue = prevRH !== null && prevRH < 0;
+    const wasClutch = prevRH !== null && prevRH < 2;
 
     // ── OVERDUE: checked in after window expired ──
     if (remainingMs < 0) {
         const overdueH = Math.abs(rH);
+        if (wasOverdue) return pick([
+            'Overdue AGAIN. This is becoming a pattern and we don\'t like the pattern.',
+            'Two in a row?? Danny is treating "alive" like a suggestion, not a requirement.',
+            'Back-to-back overdue. At this point the MIA stamp has a reserved parking spot.',
+            'Consecutive late check-ins. The protocol is filing a formal complaint.',
+        ]);
+        if (prevRH !== null && prevRH > 12) return pick([
+            'Went from early to OVERDUE. What happened between then and now, Danny?',
+            'Last time: responsible citizen. This time: legally dead for a bit. Character development.',
+            'The whiplash from last check-in to this one gave us actual whiplash.',
+            'Previous: green and happy. Now: flatline. We\'re getting emotional damage.',
+        ]);
         if (overdueH < 1) return pick([
-            'Technically dead for a few minutes there. Welcome back.',
-            'The MIA stamp was literally mid-air. That was TOO close.',
-            'Clinically deceased, then un-deceased. A medical miracle.',
-            'We had already started writing the obituary. Not kidding.',
+            'Technically dead for a few minutes there. Welcome back from the void.',
+            'The MIA stamp was literally mid-air. We could hear it whistling down.',
+            'Clinically deceased, then un-deceased. A medical miracle, or just Danny things.',
+            'We had already started writing the obituary. It was GOOD too. Shame.',
+            'The flatline played for a full minute. The community aged 10 years.',
         ]);
         if (overdueH < 4) return pick([
-            'Rose from the dead like it was casual. Hours overdue.',
-            'We were picking out memorial flowers. Glad we didn\'t commit.',
+            'Rose from the dead like it was a casual Tuesday. Hours overdue.',
+            'We were picking out memorial flowers. Went with lilies. Glad we can return them.',
             'The afterlife clearly has WiFi because he checked in from it.',
-            'Back from the shadow realm. Took his time about it too.',
+            'Back from the shadow realm. Took the scenic route apparently.',
+            'Danny said "I\'ll check in later" and meant it VERY literally.',
         ]);
         return pick([
-            'Days overdue. Lazarus himself would be impressed.',
-            'We genuinely thought this was it. Danny said "lol no."',
-            'Resurrection speedrun: failed. But he made it eventually.',
-            'At this point we\'d already divided up his NFTs. Awkward.',
+            'Days overdue. Lazarus himself took notes on this comeback.',
+            'We genuinely thought this was it. Danny said "lol no" from beyond.',
+            'Resurrection speedrun any%. Failed. Catastrophically. But he\'s here.',
+            'At this point we\'d already divided up his NFTs. Give them back? Fine.',
+            'The memorial page was drafted, reviewed, and nearly published. DANNY.',
         ]);
     }
 
     // ── CRITICAL: under 1 hour left ──
-    if (rH < 1) return pick([
-        'THAT WAS A CLOSE ONE. Minutes. MINUTES.',
-        'Checked in with the clock literally screaming. Heart attack material.',
-        'Clutched it at the buzzer. NBA Finals energy.',
-        'If this were a movie, the bomb timer would\'ve been at 00:03.',
-        'Speed ran the check-in. We can feel our blood pressure normalizing.',
-        'Photo finish. The MIA stamp was COCKED AND LOADED.',
-    ]);
+    if (rH < 1) {
+        if (closeCallCount >= 3) return pick([
+            'ANOTHER sub-1-hour finish. Danny is doing this on PURPOSE at this point.',
+            'Third close call in recent memory. Our cardiologist bills are YOUR fault, Danny.',
+            'Danny has a type and it\'s "giving the community heart failure repeatedly."',
+            'The pattern is clear: Danny waits until the protocol is literally crying.',
+        ]);
+        if (wasOverdue) return pick([
+            'Last time he was LATE. This time: barely made it. The trajectory concerns us.',
+            'Going from overdue to "made it by minutes" is NOT the improvement arc we wanted.',
+            'Previously: dead. Now: almost dead again. Danny, the bar is IN the ground.',
+        ]);
+        if (wasClutch) return pick([
+            'Back-to-back buzzer beaters. Danny thinks this is the NBA playoffs.',
+            'Another last-second save. At this rate we\'re installing a defibrillator on this page.',
+            'Two clutch saves in a row. Danny is speedrunning our collective anxiety disorder.',
+        ]);
+        return pick([
+            'THAT WAS A CLOSE ONE. Minutes. MINUTES. We can taste the adrenaline.',
+            'Checked in with the clock literally screaming. Our therapists send their regards.',
+            'Clutched it at the buzzer. The MIA stamp was LOADED, COCKED, and SWEATING.',
+            'If this were a movie, the bomb timer would\'ve been at 00:03. With dramatic music.',
+            'The entire community collectively stopped breathing. We\'re still lightheaded.',
+            'Photo finish. Danny crossed the line horizontal, gasping, on fire. But he crossed it.',
+        ]);
+    }
 
     // ── CLOSE: 1-4 hours left ──
-    if (rH < 4) return pick([
-        'That was a close one. Not "movie close," more like "heart palpitation close."',
-        'Cutting it fine, Danny. Real fine. Our nerves are shot.',
-        'Checked in with hours to spare. And by "hours" we mean barely.',
-        'The amber warning light was SCREAMING. Just saying.',
-        'Arrived fashionably late to his own alive-ness confirmation.',
-        'Danny likes to live dangerously. Ironic, given the context.',
-    ]);
+    if (rH < 4) {
+        if (closeCallCount >= 2) return pick([
+            'Close call AGAIN. Danny treats the 24h window like a 23h nap opportunity.',
+            'Another close one. We\'re sensing a theme. The theme is cardiovascular distress.',
+            'Danny\'s consistent at exactly one thing: giving us anxiety.',
+            'Pattern recognized: Danny checks in when the amber light is already a lifestyle.',
+        ]);
+        if (isImprovement && wasClutch) return pick([
+            'Marginally less terrifying than last time. Progress? We\'ll take crumbs.',
+            'Improved from "nearly dead" to "cutting it close." The growth is... something.',
+            'Baby steps. Last time was worse. Our standards have been lowered permanently.',
+        ]);
+        if (isWorse && prevRH !== null && prevRH > 12) return pick([
+            'Was doing so well last time. Then chose violence. Classic Danny arc.',
+            'Went from responsible to "that was a close one" in one check-in cycle. Impressive.',
+            'Last check-in: early and responsible. This one: community panic mode. Pick a lane.',
+        ]);
+        return pick([
+            'That was a close one. Not "movie close," more like "heart palpitation close."',
+            'Cutting it fine, Danny. Real fine. Our nerves are filing a class action lawsuit.',
+            'Checked in with hours to spare. And by "hours" we mean "barely hours." Plural is generous.',
+            'The amber warning light was SCREAMING so loud the neighbors complained.',
+            'Arrived fashionably late to his own alive-ness confirmation. Bold choice.',
+            'Danny likes to live dangerously. Ironic, given THIS is a page about whether he\'s alive.',
+            'The protocol was warming up the red stamp. Danny walked in like nothing happened.',
+        ]);
+    }
 
     // ── MODERATE: 4-12 hours left ──
-    if (rH < 12) return pick([
-        'Reasonable timing. Not great, not terrible. The Chernobyl of check-ins.',
-        'Half the window gone but who\'s counting. We are. Obsessively.',
-        'Showed up in the middle third. Very centrist of him.',
-        'Not early, not late. Aggressively average. We\'ll take it.',
-        'The clock was ticking loud enough to hear. Danny: "what clock?"',
-        'Solid B-minus effort on the timing front.',
-    ]);
+    if (rH < 12) {
+        if (wasOverdue) return pick([
+            'Massive improvement over literally being dead last time. The bar was underground.',
+            'From overdue to mid-window. Danny discovered the concept of "on time." Growth.',
+            'Last time: MIA. This time: showed up with half a window. We\'re almost proud.',
+        ]);
+        if (wasClutch) return pick([
+            'Better than last time\'s heart attack delivery. Our blood pressure thanks you.',
+            'Upgraded from "emergency" to "meh." Danny is learning. Slowly. Very slowly.',
+            'Last time we nearly died. This time we only sweated. Improvement.',
+        ]);
+        if (earlyCount >= 3) return pick([
+            'After a streak of early check-ins, Danny has relaxed. Maybe too much.',
+            'The responsible era appears to be ending. We saw this coming.',
+            'Danny got comfortable. Comfort breeds complacency. Complacency breeds amber lights.',
+        ]);
+        return pick([
+            'Reasonable timing. Not great, not terrible. The Chernobyl of check-ins.',
+            'Half the window gone but who\'s counting. We are. Obsessively. It\'s our whole job.',
+            'Showed up in the middle third. Very centrist of him. Both sides can\'t complain.',
+            'Not early, not late. Aggressively average. The beige of alive-ness confirmation.',
+            'The clock was ticking loud enough to hear. Danny: "what clock? I was napping."',
+            'Solid B-minus effort. The kind of grade that says "I did the homework on the bus."',
+            'Danny rolled in at the halfway point like it was a hotel checkout. "Late checkout, please."',
+        ]);
+    }
 
     // ── COMFORTABLE: 12-20 hours left ──
-    if (rH < 20) return pick([
-        'Early-ish. The community\'s collective anxiety barely registered.',
-        'Checked in before anyone started sweating. How considerate.',
-        'A responsible, timely check-in. Who is this person.',
-        'Plenty of time to spare. Almost suspiciously responsible.',
-        'Danny woke up and chose accountability. Unprecedented.',
-        'The green light didn\'t even flicker. Boring. (Thank God.)',
-    ]);
+    if (rH < 20) {
+        if (wasOverdue) return pick([
+            'From DEAD to EARLY? Who is this person and what did they do with Danny?',
+            'Last check-in: literally overdue. This one: responsible. We\'re suspicious.',
+            'Danny went from obituary-ready to teacher\'s pet in one cycle. Unhinged character arc.',
+        ]);
+        if (wasClutch) return pick([
+            'After last time\'s near-death experience, Danny chose responsibility. Trauma works.',
+            'Turns out almost going MIA is motivating. Who knew? Not Danny, until now.',
+            'Last time we aged 10 years. This time: peace. Danny learned from the pain.',
+        ]);
+        if (earlyCount >= 3) return pick([
+            'Consistent early check-ins. Danny is in his responsible era and we are HERE for it.',
+            'Three-peat of early check-ins. Either Danny reformed or he automated this.',
+            'Danny is on a streak. The protocol is bored. We love being bored.',
+        ]);
+        return pick([
+            'Early-ish. The community\'s collective anxiety barely registered on the meter.',
+            'Checked in before anyone started sweating. How uncharacteristically considerate.',
+            'A responsible, timely check-in. Who is this person. Show yourself.',
+            'Plenty of time to spare. Almost suspiciously responsible. Are we being catfished?',
+            'Danny woke up and chose accountability. Unprecedented. We\'re framing this one.',
+            'The green light didn\'t even flicker. Boring. (Thank God. Boring is alive.)',
+        ]);
+    }
 
     // ── FRESH: 20-24 hours left ──
+    if (wasOverdue) return pick([
+        'From LITERALLY DEAD to checking in within MINUTES? The guilt hit DIFFERENT.',
+        'Danny went from ghost to overeager in one cycle. Overcompensation level: maximum.',
+        'Previously: MIA for hours. Now: hammering the button like it owes him money. Trauma.',
+    ]);
+    if (wasClutch) return pick([
+        'Last time: buzzer beater. This time: first in line. Danny has been scared straight.',
+        'Went from "made it by seconds" to "made it instantly." Therapy or paranoia? Either way, progress.',
+        'The near-death experience cured whatever was wrong. Danny is EARLY. Write this down.',
+    ]);
     return pick([
-        'Speedrun check-in. Danny hammered that button like rent was due.',
-        'Checked in so fast the previous check-in was still warm.',
-        'Eager. Almost too eager. Are we sure he\'s not a bot?',
-        'Immediate re-check-in. This man fears the MIA stamp.',
-        'Basically checked in before he even needed to. Overachiever.',
+        'Speedrun check-in. Danny hammered that button like rent was due YESTERDAY.',
+        'Checked in so fast the previous check-in was still warm. Overachiever energy.',
+        'Eager. Almost too eager. Are we sure this isn\'t a bot wearing Danny\'s wallet?',
+        'Immediate re-check-in. This man fears the MIA stamp and it SHOWS.',
+        'Basically checked in before he even needed to. The protocol is impressed and confused.',
         'Full 24 hours on the clock. Danny woke up and chose violence against doubt.',
+        'Danny hit the button so fast his wallet barely had time to load. Relax, king.',
     ]);
 }
 
