@@ -209,7 +209,8 @@ export function DannyStatus() {
                         {(isAlive || statusClass === 'warning') && !loading ? (
                             <polyline
                                 className={`signal-line ${statusClass === 'warning' ? 'warning' : 'alive'}`}
-                                points="0,20 60,20 80,20 90,5 100,35 110,8 118,25 126,20 160,20 220,20 240,20 250,5 260,35 270,8 278,25 286,20 320,20 380,20 400,20 410,5 420,35 430,8 438,25 446,20 500,20"
+                                points={generateHeartbeatPoints(remaining ?? 24)}
+                                style={{ animationDuration: `${getAnimationSpeed(remaining ?? 24)}s` }}
                             />
                         ) : (
                             <line className="signal-line flat" x1="0" y1="20" x2="500" y2="20" />
@@ -470,6 +471,66 @@ function getStatusQuip(lastCheckin: number | null): { quip: string; sub: string 
         ]),
         sub: 'If you know Danny, please remind him the internet is waiting.',
     };
+}
+
+/**
+ * Generate SVG polyline points for heartbeat based on remaining hours.
+ * More beats when healthy, fewer as window closes.
+ */
+function generateHeartbeatPoints(remainingHours: number): string {
+    const W = 500;
+    const MID = 20;
+
+    // Determine beat count + intensity based on remaining time
+    let beats: number;
+    let amplitude: number; // peak deviation from midline
+    if (remainingHours > 20)      { beats = 6; amplitude = 16; }
+    else if (remainingHours > 16) { beats = 5; amplitude = 15; }
+    else if (remainingHours > 12) { beats = 4; amplitude = 14; }
+    else if (remainingHours > 8)  { beats = 3; amplitude = 13; }
+    else if (remainingHours > 4)  { beats = 2; amplitude = 11; }
+    else if (remainingHours > 1)  { beats = 1; amplitude = 9; }
+    else                          { beats = 1; amplitude = 6; }
+
+    if (beats === 0) return `0,${MID} ${W},${MID}`;
+
+    const points: string[] = [`0,${MID}`];
+
+    // Spread beats evenly across the width
+    const spacing = W / (beats + 1);
+
+    for (let i = 1; i <= beats; i++) {
+        const cx = Math.round(spacing * i);
+
+        // Lead-in flat segment
+        points.push(`${cx - 14},${MID}`);
+
+        // QRS complex: sharp spike up, deep down, recover up, settle
+        points.push(`${cx - 8},${MID}`);
+        points.push(`${cx - 4},${MID - amplitude}`);      // R peak (up)
+        points.push(`${cx},${MID + Math.round(amplitude * 0.85)}`);  // S valley (down)
+        points.push(`${cx + 5},${MID - Math.round(amplitude * 0.4)}`); // small bounce
+        points.push(`${cx + 9},${MID}`);
+
+        // Trail-out flat
+        points.push(`${cx + 14},${MID}`);
+    }
+
+    points.push(`${W},${MID}`);
+    return points.join(' ');
+}
+
+/**
+ * Animation sweep speed: slower as beats decrease (more dramatic pauses).
+ */
+function getAnimationSpeed(remainingHours: number): number {
+    if (remainingHours > 20) return 2;
+    if (remainingHours > 16) return 2.5;
+    if (remainingHours > 12) return 3;
+    if (remainingHours > 8)  return 3.5;
+    if (remainingHours > 4)  return 4.5;
+    if (remainingHours > 1)  return 6;
+    return 8; // final hour: painfully slow single blip
 }
 
 function formatTimeSince(timestamp: number): string {
